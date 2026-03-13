@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>🎱 Billar Multijugador</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #1a0f0a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: 'Press Start 2P', monospace;
+    overflow: hidden;
+  }
+  #hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 700px;
+    margin-bottom: 6px;
+    font-size: 8px;
+  }
+  #hud-me { color: #00ffcc; }
+  #hud-turn { color: #ffdd88; text-align:center; }
+  #hud-opp { color: #ff6b6b; text-align:right; }
+  #msg-bar {
+    width: 700px;
+    text-align: center;
+    font-size: 7px;
+    color: #ff9944;
+    margin-bottom: 4px;
+    min-height: 14px;
+  }
+  canvas { display:block; cursor:crosshair; border-radius:6px; }
+  #controls { margin-top:6px; color:#ffffff33; font-size:6px; display:flex; gap:24px; }
+  #controls span { color:#ffffff77; }
+
+  /* Lobby overlay */
+  #overlay {
+    position:absolute;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    background: rgba(10,5,2,0.92);
+    border-radius: 6px;
+    padding: 30px 40px;
+  }
+  #overlay-title { color:#ffdd88; font-size:16px; text-shadow:0 0 20px #ffdd88; text-align:center; line-height:2; }
+  #overlay-sub { color:#ffffff66; font-size:7px; text-align:center; line-height:2.5; }
+  .btn {
+    background:transparent;
+    border:2px solid #ffdd88;
+    color:#ffdd88;
+    font-family:'Press Start 2P',monospace;
+    font-size:9px;
+    padding:10px 22px;
+    cursor:pointer;
+    text-shadow:0 0 10px #ffdd88;
+    box-shadow:0 0 16px #ffdd8844;
+    transition:all 0.2s;
+    width: 100%;
+  }
+  .btn:hover { background:#ffdd8822; box-shadow:0 0 28px #ffdd88; }
+  .btn.green { border-color:#00ffcc; color:#00ffcc; text-shadow:0 0 10px #00ffcc; box-shadow:0 0 16px #00ffcc44; }
+  .btn.green:hover { background:#00ffcc22; }
+  #room-input {
+    background:#111;
+    border:2px solid #ffffff33;
+    color:#fff;
+    font-family:'Press Start 2P',monospace;
+    font-size:9px;
+    padding:10px 14px;
+    width:100%;
+    text-align:center;
+    outline:none;
+  }
+  #room-input:focus { border-color:#ffdd88; }
+  #waiting { color:#ffffff66; font-size:7px; text-align:center; line-height:2.2; }
+  .spinner {
+    display:inline-block;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <span id="hud-me">TÚ: —</span>
+  <span id="hud-turn">—</span>
+  <span id="hud-opp">RIVAL: —</span>
+</div>
+<div id="msg-bar"></div>
+<div style="position:relative;">
+  <canvas id="c" width="700" height="380"></canvas>
+
+  <!-- LOBBY -->
+  <div id="overlay">
+    <div id="overlay-title">🎱 BILLAR<br>MULTIJUGADOR</div>
+    <div id="screen-menu">
+      <div id="overlay-sub" style="margin-bottom:10px">¿QUÉ QUIERES HACER?</div>
+      <button class="btn green" onclick="showCreate()" style="margin-bottom:8px">🆕 CREAR PARTIDA</button>
+      <button class="btn" onclick="showJoin()">🔗 UNIRSE A PARTIDA</button>
+    </div>
+    <div id="screen-create" style="display:none; width:100%">
+      <div id="overlay-sub" style="margin-bottom:10px">TU CÓDIGO DE SALA:</div>
+      <div id="room-code-display" style="color:#00ffcc;font-size:20px;text-align:center;text-shadow:0 0 20px #00ffcc;margin-bottom:14px;letter-spacing:4px;"></div>
+      <div id="waiting">COMPARTE ESTE CÓDIGO<br>CON TU RIVAL<br><br><span class="spinner">⏳</span> ESPERANDO JUGADOR 2...</div>
+    </div>
+    <div id="screen-join" style="display:none; width:100%">
+      <div id="overlay-sub" style="margin-bottom:8px">INTRODUCE EL CÓDIGO:</div>
+      <input id="room-input" type="text" maxlength="4" placeholder="CÓDIGO" oninput="this.value=this.value.toUpperCase()"/>
+      <br><br>
+      <button class="btn green" onclick="joinRoom()">▶ UNIRSE</button>
+    </div>
+  </div>
+</div>
+<div id="controls">
+  <div><span>RATÓN</span> APUNTAR</div>
+  <div><span>CLIC LARGO</span> FUERZA</div>
+  <div><span>SOLTAR</span> DISPARAR</div>
+</div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDxMJXKfGJAngeSi-JbrtieIgyZZN5Q6P8",
+  authDomain: "billar-workadventure.firebaseapp.com",
+  databaseURL: "https://billar-workadventure-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "billar-workadventure",
+  storageBucket: "billar-workadventure.firebasestorage.app",
+  messagingSenderId: "773546684259",
+  appId: "1:773546684259:web:034a2dcd3702d8b5766d56"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// ─── GAME CONSTANTS ───
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = 700, H = 380;
+const TX = 30, TY = 30, TW = 640, TH = 320;
+const POCKET_R = 16, BALL_R = 12;
+const FRICTION = 0.983, MIN_SPEED = 0.07;
+
+const POCKETS = [
+  {x:TX,y:TY},{x:TX+TW/2,y:TY-4},{x:TX+TW,y:TY},
+  {x:TX,y:TY+TH},{x:TX+TW/2,y:TY+TH+4},{x:TX+TW,y:TY+TH}
+];
+
+const BALL_COLORS = [
+  '#f5f5f5','#f5c518','#1a6bcc','#cc2200','#660099',
+  '#dd5500','#006600','#880000','#111111',
+  '#f5c518','#1a6bcc','#cc2200','#660099','#dd5500','#006600','#880000'
+];
+
+// ─── STATE ───
+let myPlayer = null; // 1 or 2
+let roomId = null;
+let balls = [];
+let gameState = 'lobby'; // lobby | waiting | playing | over
+let turnPlayer = 1;
+let myType = null, oppType = null; // 'solids' | 'stripes' | null
+let assigned = false;
+let aiming = false, chargeStart = 0, chargeAmt = 0;
+let mouseX = W/2, mouseY = H/2;
+let animId;
+let syncTimer = 0;
+let msgTimeout;
+
+// ─── LOBBY FUNCTIONS (exposed globally) ───
+window.showCreate = function() {
+  const code = Math.random().toString(36).substring(2,6).toUpperCase();
+  roomId = code;
+  myPlayer = 1;
+  document.getElementById('screen-menu').style.display = 'none';
+  document.getElementById('screen-create').style.display = 'block';
+  document.getElementById('room-code-display').textContent = code;
+  initGame();
+  const roomRef = ref(db, 'rooms/' + code);
+  set(roomRef, {
+    state: 'waiting',
+    turn: 1,
+    assigned: false,
+    p1type: null,
+    p2type: null,
+    balls: serializeBalls(),
+    shot: null
+  });
+  // Watch for player 2
+  onValue(ref(db, 'rooms/' + code + '/state'), snap => {
+    if (snap.val() === 'playing' && myPlayer === 1) startPlaying();
+  });
+};
+
+window.showJoin = function() {
+  document.getElementById('screen-menu').style.display = 'none';
+  document.getElementById('screen-join').style.display = 'block';
+};
+
+window.joinRoom = function() {
+  const code = document.getElementById('room-input').value.trim().toUpperCase();
+  if (code.length < 2) return;
+  roomId = code;
+  myPlayer = 2;
+  get(ref(db, 'rooms/' + code)).then(snap => {
+    if (!snap.exists()) { alert('SALA NO ENCONTRADA'); return; }
+    // Load ball state from host
+    const data = snap.val();
+    deserializeBalls(data.balls);
+    turnPlayer = data.turn;
+    assigned = data.assigned;
+    myType = data.p2type;
+    oppType = data.p1type;
+    update(ref(db, 'rooms/' + code), { state: 'playing' });
+    startPlaying();
+  });
+};
+
+function startPlaying() {
+  document.getElementById('overlay').style.display = 'none';
+  gameState = 'playing';
+  listenToRoom();
+  updateHUD();
+  if (!animId) animId = requestAnimationFrame(loop);
+}
+
+function listenToRoom() {
+  onValue(ref(db, 'rooms/' + roomId), snap => {
+    if (!snap.exists() || gameState !== 'playing') return;
+    const data = snap.val();
+    // If it's not my turn, sync ball positions from DB
+    if (data.turn !== myPlayer && data.balls) {
+      deserializeBalls(data.balls);
+    }
+    turnPlayer = data.turn;
+    assigned = data.assigned || false;
+    if (myPlayer === 1) { myType = data.p1type; oppType = data.p2type; }
+    else { myType = data.p2type; oppType = data.p1type; }
+    // Shot fired by opponent
+    if (data.shot && data.shot.by !== myPlayer && gameState === 'playing') {
+      const cue = balls.find(b => b.id === 0);
+      if (cue && !cue.pocketed) {
+        cue.vx = data.shot.vx;
+        cue.vy = data.shot.vy;
+        update(ref(db, 'rooms/' + roomId), { shot: null });
+      }
+    }
+    if (data.gameOver) showGameOver(data.gameOver);
+    updateHUD();
+  });
+}
+
+// ─── GAME INIT ───
+function initGame() {
+  balls = [];
+  balls.push({ id:0, x:TX+TW*0.25, y:TY+TH/2, vx:0, vy:0, pocketed:false });
+  const rx = TX+TW*0.72, ry = TY+TH/2;
+  const gap = BALL_R*2+1;
+  const rack = [[1],[2,9],[3,8,10],[4,11,5,12],[13,6,14,7,15]];
+  rack.forEach((row, col) => {
+    row.forEach((id, ri) => {
+      const bx = rx + col*(gap*Math.cos(Math.PI/6));
+      const by = ry + (ri - (row.length-1)/2)*gap;
+      balls.push({ id, x:bx, y:by, vx:0, vy:0, pocketed:false });
+    });
+  });
+  turnPlayer = 1; assigned = false; myType = null; oppType = null;
+}
+
+function serializeBalls() {
+  return balls.map(b => ({
+    id:b.id, x:Math.round(b.x*10)/10, y:Math.round(b.y*10)/10,
+    vx:Math.round(b.vx*100)/100, vy:Math.round(b.vy*100)/100, pocketed:b.pocketed
+  }));
+}
+
+function deserializeBalls(data) {
+  if (!data) return;
+  const arr = Array.isArray(data) ? data : Object.values(data);
+  balls = arr.map(b => ({ id:b.id, x:b.x, y:b.y, vx:b.vx||0, vy:b.vy||0, pocketed:b.pocketed||false }));
+}
+
+// ─── PHYSICS ───
+function allStopped() {
+  return balls.every(b => b.pocketed || (Math.abs(b.vx)<MIN_SPEED && Math.abs(b.vy)<MIN_SPEED));
+}
+
+let rolling = false;
+let pocketedThisTurn = [];
+
+function physicsTick() {
+  if (!rolling) return;
+  balls.forEach(b => {
+    if (b.pocketed) return;
+    b.x += b.vx; b.y += b.vy;
+    b.vx *= FRICTION; b.vy *= FRICTION;
+    if (Math.abs(b.vx)<MIN_SPEED && Math.abs(b.vy)<MIN_SPEED) { b.vx=0; b.vy=0; }
+    if (b.x-BALL_R<TX) { b.x=TX+BALL_R; b.vx=Math.abs(b.vx)*0.8; }
+    if (b.x+BALL_R>TX+TW) { b.x=TX+TW-BALL_R; b.vx=-Math.abs(b.vx)*0.8; }
+    if (b.y-BALL_R<TY) { b.y=TY+BALL_R; b.vy=Math.abs(b.vy)*0.8; }
+    if (b.y+BALL_R>TY+TH) { b.y=TY+TH-BALL_R; b.vy=-Math.abs(b.vy)*0.8; }
+    POCKETS.forEach(p => {
+      const dx=b.x-p.x, dy=b.y-p.y;
+      if (Math.sqrt(dx*dx+dy*dy)<POCKET_R) {
+        b.pocketed=true; b.vx=0; b.vy=0;
+        pocketedThisTurn.push(b.id);
+        handlePocket(b);
+      }
+    });
+  });
+  // Ball collisions
+  for (let i=0;i<balls.length;i++) {
+    for (let j=i+1;j<balls.length;j++) {
+      const a=balls[i], b=balls[j];
+      if (a.pocketed||b.pocketed) continue;
+      const dx=b.x-a.x, dy=b.y-a.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if (dist<BALL_R*2 && dist>0) {
+        const nx=dx/dist, ny=dy/dist;
+        const overlap=BALL_R*2-dist;
+        a.x-=nx*overlap/2; a.y-=ny*overlap/2;
+        b.x+=nx*overlap/2; b.y+=ny*overlap/2;
+        const dvx=a.vx-b.vx, dvy=a.vy-b.vy;
+        const dot=dvx*nx+dvy*ny;
+        if (dot>0) { a.vx-=dot*nx; a.vy-=dot*ny; b.vx+=dot*nx; b.vy+=dot*ny; }
+      }
+    }
+  }
+  // Sync positions to DB every 3 frames if I'm the one shooting
+  if (turnPlayer === myPlayer) {
+    syncTimer++;
+    if (syncTimer % 3 === 0) {
+      update(ref(db, 'rooms/' + roomId), { balls: serializeBalls() });
+    }
+  }
+  if (allStopped()) {
+    rolling = false;
+    const cue = balls.find(b=>b.id===0);
+    if (cue && cue.pocketed) {
+      cue.pocketed=false; cue.x=TX+TW*0.25; cue.y=TY+TH/2; cue.vx=0; cue.vy=0;
+      showMsg('⚪ FALTA — BOLA BLANCA');
+      switchTurn();
+    } else {
+      // If pocketed something valid, same turn; else switch
+      const validPocketed = pocketedThisTurn.filter(id => id !== 0 && id !== 8);
+      const myBallIds = myType === 'solids' ? [1,2,3,4,5,6,7] : [9,10,11,12,13,14,15];
+      const potted = validPocketed.filter(id => myBallIds.includes(id));
+      if (potted.length > 0 && turnPlayer === myPlayer) {
+        // keep turn
+        update(ref(db,'rooms/'+roomId),{balls:serializeBalls()});
+      } else {
+        switchTurn();
+      }
+    }
+    pocketedThisTurn = [];
+    update(ref(db,'rooms/'+roomId),{balls:serializeBalls()});
+  }
+}
+
+function handlePocket(b) {
+  if (b.id === 8) {
+    const myBallIds = myType === 'solids' ? [1,2,3,4,5,6,7] : [9,10,11,12,13,14,15];
+    const remaining = balls.filter(x => !x.pocketed && myBallIds.includes(x.id));
+    if (remaining.length === 0) {
+      update(ref(db,'rooms/'+roomId),{ gameOver: 'J'+myPlayer+' GANA 🏆' });
+    } else {
+      update(ref(db,'rooms/'+roomId),{ gameOver: 'J'+myPlayer+' PIERDE 💀' });
+    }
+    return;
+  }
+  // Assign types on first pocket
+  if (!assigned && b.id !== 8) {
+    assigned = true;
+    const shooterSolids = b.id <= 7;
+    const p1solids = myPlayer === 1 ? shooterSolids : !shooterSolids;
+    update(ref(db,'rooms/'+roomId),{
+      assigned: true,
+      p1type: p1solids ? 'solids' : 'stripes',
+      p2type: p1solids ? 'stripes' : 'solids'
+    });
+    myType = myPlayer === 1 ? (p1solids?'solids':'stripes') : (p1solids?'stripes':'solids');
+    showMsg('J1: '+(p1solids?'SÓLIDAS ●':'RAYADAS ◎')+' / J2: '+(p1solids?'RAYADAS ◎':'SÓLIDAS ●'));
+  }
+}
+
+function switchTurn() {
+  const next = turnPlayer === 1 ? 2 : 1;
+  update(ref(db,'rooms/'+roomId),{ turn: next, balls: serializeBalls() });
+  turnPlayer = next;
+  updateHUD();
+}
+
+// ─── SHOOT ───
+function shoot(vx, vy) {
+  const cue = balls.find(b=>b.id===0);
+  if (!cue || cue.pocketed) return;
+  cue.vx = vx; cue.vy = vy;
+  rolling = true; pocketedThisTurn = [];
+  update(ref(db,'rooms/'+roomId),{ shot:{ vx, vy, by: myPlayer } });
+}
+
+// ─── MAIN LOOP ───
+function loop() {
+  physicsTick();
+  draw();
+  animId = requestAnimationFrame(loop);
+}
+
+// ─── DRAW ───
+function draw() {
+  ctx.clearRect(0,0,W,H);
+  // Wood
+  const wood = ctx.createLinearGradient(0,0,W,H);
+  wood.addColorStop(0,'#5c3317'); wood.addColorStop(0.5,'#7a4520'); wood.addColorStop(1,'#5c3317');
+  ctx.fillStyle=wood; ctx.beginPath(); ctx.roundRect(0,0,W,H,8); ctx.fill();
+  // Felt
+  const felt = ctx.createRadialGradient(TX+TW/2,TY+TH/2,10,TX+TW/2,TY+TH/2,TW/2);
+  felt.addColorStop(0,'#1a6b3a'); felt.addColorStop(1,'#145530');
+  ctx.fillStyle=felt; ctx.fillRect(TX,TY,TW,TH);
+  // Center line
+  ctx.setLineDash([4,8]); ctx.strokeStyle='#ffffff0a'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(TX+TW/2,TY); ctx.lineTo(TX+TW/2,TY+TH); ctx.stroke();
+  ctx.setLineDash([]);
+  // Pockets
+  POCKETS.forEach(p => {
+    ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(p.x,p.y,POCKET_R,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#333'; ctx.lineWidth=2; ctx.stroke();
+  });
+  // Balls
+  balls.forEach(b => {
+    if (b.pocketed) return;
+    const isStripe = b.id >= 9;
+    const color = BALL_COLORS[b.id];
+    ctx.fillStyle='rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(b.x+3,b.y+3,BALL_R,BALL_R*0.6,0,0,Math.PI*2); ctx.fill();
+    if (isStripe) {
+      ctx.fillStyle='#f5f5f5'; ctx.beginPath(); ctx.arc(b.x,b.y,BALL_R,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=color;
+      ctx.beginPath(); ctx.arc(b.x,b.y,BALL_R,-Math.PI*0.35,Math.PI*0.35); ctx.fill();
+      ctx.beginPath(); ctx.arc(b.x,b.y,BALL_R,Math.PI*0.65,Math.PI*1.35); ctx.fill();
+    } else {
+      ctx.fillStyle=color; ctx.beginPath(); ctx.arc(b.x,b.y,BALL_R,0,Math.PI*2); ctx.fill();
+    }
+    const shine=ctx.createRadialGradient(b.x-BALL_R*0.3,b.y-BALL_R*0.3,1,b.x,b.y,BALL_R);
+    shine.addColorStop(0,'rgba(255,255,255,0.45)'); shine.addColorStop(0.4,'rgba(255,255,255,0.1)'); shine.addColorStop(1,'rgba(0,0,0,0.15)');
+    ctx.fillStyle=shine; ctx.beginPath(); ctx.arc(b.x,b.y,BALL_R,0,Math.PI*2); ctx.fill();
+    if (b.id !== 0) {
+      if (isStripe) { ctx.fillStyle='#f5f5f5'; ctx.beginPath(); ctx.arc(b.x,b.y,5,0,Math.PI*2); ctx.fill(); }
+      ctx.fillStyle='#222'; ctx.font='bold 7px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(b.id,b.x,b.y);
+    }
+  });
+  // Aim & cue (only when it's my turn)
+  const cue = balls.find(b=>b.id===0);
+  const myTurn = turnPlayer === myPlayer;
+  if (cue && !cue.pocketed && gameState==='playing' && myTurn && !rolling) {
+    const dx=mouseX-cue.x, dy=mouseY-cue.y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if (dist>5) {
+      const nx=dx/dist, ny=dy/dist;
+      ctx.setLineDash([6,6]); ctx.strokeStyle='rgba(255,255,200,0.3)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(cue.x,cue.y); ctx.lineTo(cue.x+nx*180,cue.y+ny*180); ctx.stroke();
+      ctx.setLineDash([]);
+      if (aiming && chargeAmt>0) {
+        ctx.fillStyle='#00000066'; ctx.fillRect(TX,TY+TH+8,TW,8);
+        ctx.fillStyle=chargeAmt<0.5?'#44ff88':chargeAmt<0.8?'#ffdd44':'#ff4444';
+        ctx.fillRect(TX,TY+TH+8,TW*chargeAmt,8);
+      }
+      const cueOff=BALL_R+5+(aiming?chargeAmt*22:0);
+      ctx.save();
+      ctx.translate(cue.x,cue.y);
+      ctx.rotate(Math.atan2(dy,dx)+Math.PI);
+      const cg=ctx.createLinearGradient(cueOff,-3,cueOff+110,3);
+      cg.addColorStop(0,'#f5deb3'); cg.addColorStop(0.3,'#d4a96a'); cg.addColorStop(1,'#8b5a2b');
+      ctx.fillStyle=cg;
+      ctx.beginPath(); ctx.moveTo(cueOff,-2); ctx.lineTo(cueOff+110,-5); ctx.lineTo(cueOff+110,5); ctx.lineTo(cueOff,2); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
+  // "Not your turn" indicator
+  if (gameState==='playing' && !myTurn && !rolling) {
+    ctx.fillStyle='rgba(0,0,0,0.35)';
+    ctx.fillRect(TX,TY,TW,TH);
+    ctx.fillStyle='#ffdd88';
+    ctx.font='9px "Press Start 2P"';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('TURNO DEL RIVAL...', TX+TW/2, TY+TH/2);
+  }
+}
+
+// ─── HUD ───
+function updateHUD() {
+  const alive = balls.filter(b=>!b.pocketed&&b.id!==0&&b.id!==8).length;
+  const me = myPlayer === 1 ? 'J1' : 'J2';
+  const opp = myPlayer === 1 ? 'J2' : 'J1';
+  const myT = myType ? (myType==='solids'?'●':'◎') : '?';
+  const oppT = oppType ? (oppType==='solids'?'●':'◎') : '?';
+  document.getElementById('hud-me').textContent = `TÚ (${me}) ${myT}`;
+  document.getElementById('hud-opp').textContent = `RIVAL (${opp}) ${oppT}`;
+  document.getElementById('hud-turn').textContent = turnPlayer === myPlayer ? '🟢 TU TURNO' : '⏳ RIVAL';
+  document.querySelector('#controls').previousElementSibling.textContent = `BOLAS VIVAS: ${alive}`;
+}
+
+function showMsg(txt) {
+  document.getElementById('msg-bar').textContent = txt;
+  clearTimeout(msgTimeout);
+  msgTimeout = setTimeout(()=>{ document.getElementById('msg-bar').textContent=''; }, 3500);
+}
+
+function showGameOver(msg) {
+  gameState = 'over';
+  const ov = document.getElementById('overlay');
+  document.getElementById('overlay-title').innerHTML = msg;
+  document.getElementById('overlay-sub').innerHTML = '';
+  document.getElementById('screen-menu').style.display='none';
+  document.getElementById('screen-create').style.display='none';
+  document.getElementById('screen-join').style.display='none';
+  // Show restart
+  const btn = document.getElementById('start-btn-restart') || document.createElement('button');
+  btn.id='start-btn-restart'; btn.className='btn green'; btn.textContent='▶ NUEVA PARTIDA';
+  btn.onclick = () => { remove(ref(db,'rooms/'+roomId)); location.reload(); };
+  ov.appendChild(btn);
+  ov.style.display='flex'; ov.classList.add('active');
+}
+
+// ─── INPUT ───
+canvas.addEventListener('mousemove', e => {
+  const r=canvas.getBoundingClientRect();
+  mouseX=e.clientX-r.left; mouseY=e.clientY-r.top;
+  if (aiming) { chargeAmt=Math.min((Date.now()-chargeStart)/1500,1); }
+});
+canvas.addEventListener('mousedown', e => {
+  if (gameState!=='playing'||turnPlayer!==myPlayer||rolling) return;
+  aiming=true; chargeStart=Date.now(); chargeAmt=0;
+});
+canvas.addEventListener('mouseup', e => {
+  if (!aiming) return; aiming=false;
+  if (gameState!=='playing'||turnPlayer!==myPlayer||rolling) return;
+  const cue=balls.find(b=>b.id===0);
+  if (!cue||cue.pocketed) return;
+  const dx=mouseX-cue.x, dy=mouseY-cue.y;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  if (dist<5) return;
+  const nx=dx/dist, ny=dy/dist;
+  const power=chargeAmt*16;
+  rolling=true;
+  shoot(nx*power, ny*power);
+  chargeAmt=0;
+});
+
+// Initial draw
+ctx.fillStyle='#1a0f0a'; ctx.fillRect(0,0,W,H);
+animId = requestAnimationFrame(loop);
+</script>
+</body>
+</html>
