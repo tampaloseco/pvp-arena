@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>🕵️ El Asesino</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#0a0a0a;
+    font-family:'VT323',monospace;
+    color:#fff;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+  }
+  /* Scanlines */
+  body::before {
+    content:''; position:fixed; inset:0;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.1) 2px,rgba(0,0,0,0.1) 4px);
+    pointer-events:none; z-index:999;
+  }
+
+  #app {
+    width:500px;
+    background:#0f0f0f;
+    border:3px solid #cc0000;
+    box-shadow:0 0 30px #cc000044;
+    padding:20px;
+    border-radius:4px;
+  }
+
+  h1 { font-family:'Press Start 2P',monospace; font-size:10px; color:#cc0000; text-shadow:0 0 15px #cc0000; text-align:center; margin-bottom:16px; letter-spacing:2px; }
+
+  .btn {
+    font-family:'Press Start 2P',monospace;
+    font-size:8px;
+    padding:10px 16px;
+    border:2px solid;
+    background:transparent;
+    cursor:pointer;
+    transition:all 0.15s;
+    display:block;
+    width:100%;
+    margin-bottom:8px;
+  }
+  .btn:hover { filter:brightness(1.4); }
+  .btn-red { color:#cc0000; border-color:#cc0000; }
+  .btn-red:hover { background:#cc000022; }
+  .btn-green { color:#44ff88; border-color:#44ff88; }
+  .btn-green:hover { background:#44ff8822; }
+  .btn-gray { color:#aaa; border-color:#aaa; }
+  .btn-gray:hover { background:#aaaaaa22; }
+  .btn-yellow { color:#ffdd00; border-color:#ffdd00; }
+  .btn-yellow:hover { background:#ffdd0022; }
+
+  input[type=text] {
+    background:#0a0a0a;
+    border:2px solid #ffffff22;
+    color:#fff;
+    font-family:'VT323',monospace;
+    font-size:18px;
+    padding:8px 12px;
+    width:100%;
+    outline:none;
+    margin-bottom:8px;
+    text-align:center;
+  }
+  input[type=text]:focus { border-color:#cc0000; }
+
+  .code-display { font-family:'Press Start 2P',monospace; font-size:24px; color:#cc0000; text-shadow:0 0 15px #cc0000; text-align:center; letter-spacing:6px; margin:10px 0; }
+  .label { font-size:14px; color:#ffffff55; text-align:center; margin-bottom:4px; }
+  .section { background:#0a0a0a; border:1px solid #ffffff11; padding:10px; border-radius:4px; margin-bottom:10px; }
+  .section-title { font-family:'Press Start 2P',monospace; font-size:7px; color:#666; margin-bottom:8px; }
+
+  /* Role card */
+  #role-card {
+    text-align:center;
+    padding:20px;
+    border:3px solid;
+    border-radius:4px;
+    margin-bottom:14px;
+  }
+  #role-icon { font-size:48px; margin-bottom:8px; }
+  #role-name { font-family:'Press Start 2P',monospace; font-size:12px; margin-bottom:8px; }
+  #role-desc { font-size:16px; line-height:1.6; color:#bbb; }
+  #role-word { font-size:20px; color:#ffdd00; margin-top:8px; }
+
+  /* Players */
+  .player-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #ffffff0a; font-size:16px; }
+  .player-alive { color:#44ff88; }
+  .player-dead { color:#ff4444; text-decoration:line-through; }
+  .player-host { color:#ffdd00; }
+
+  /* Vote */
+  .vote-btn {
+    font-family:'Press Start 2P',monospace;
+    font-size:6px;
+    padding:4px 8px;
+    border:1px solid #cc0000;
+    color:#cc0000;
+    background:transparent;
+    cursor:pointer;
+    border-radius:2px;
+  }
+  .vote-btn:hover { background:#cc000022; }
+  .vote-btn:disabled { opacity:0.3; cursor:not-allowed; }
+  .vote-count { font-size:14px; color:#cc0000; min-width:20px; text-align:right; }
+
+  /* Chat */
+  #chat-log { height:80px; overflow-y:auto; font-size:14px; line-height:1.6; }
+  #chat-log p { color:#888; }
+  #chat-log p.system { color:#cc0000; }
+  #chat-log p.vote { color:#ffdd00; }
+  #chat-input-row { display:flex; gap:6px; margin-top:6px; }
+  #chat-input { flex:1; font-size:16px; margin-bottom:0; text-align:left; }
+  #chat-send { width:auto; margin-bottom:0; font-size:6px; padding:6px 10px; }
+
+  /* Timer */
+  #timer-bar-wrap { background:#1a0000; height:8px; border-radius:4px; overflow:hidden; margin-bottom:10px; }
+  #timer-bar { height:100%; background:#cc0000; transition:width 1s linear; }
+  #timer-text { font-family:'Press Start 2P',monospace; font-size:10px; color:#cc0000; text-align:center; margin-bottom:6px; }
+
+  /* Phase indicator */
+  #phase-badge { font-family:'Press Start 2P',monospace; font-size:7px; padding:4px 10px; border:1px solid; border-radius:2px; display:inline-block; margin-bottom:10px; }
+
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>🕵️ EL ASESINO</h1>
+
+  <!-- LOBBY -->
+  <div id="screen-lobby">
+    <input id="name-input" type="text" placeholder="TU NOMBRE" maxlength="16" />
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-red" onclick="createRoom()" style="flex:1">🆕 CREAR</button>
+      <div style="flex:1;display:flex;gap:4px;">
+        <input id="join-code" type="text" placeholder="CÓDIGO" maxlength="4" style="font-size:14px;width:80px;margin:0;" oninput="this.value=this.value.toUpperCase()"/>
+        <button class="btn btn-gray" onclick="joinRoom()" style="width:auto;padding:10px;margin:0">▶</button>
+      </div>
+    </div>
+    <div id="lobby-code-wrap" class="hidden" style="margin-top:10px">
+      <div class="label">CÓDIGO DE SALA:</div>
+      <div class="code-display" id="lobby-code"></div>
+    </div>
+    <div id="lobby-players-list" class="section hidden">
+      <div class="section-title">JUGADORES</div>
+      <div id="lobby-names" style="font-size:16px;color:#aaa;"></div>
+    </div>
+    <button id="start-game-btn" class="btn btn-green hidden" onclick="startGame()">▶ INICIAR JUEGO</button>
+    <div id="lobby-status" class="label"></div>
+  </div>
+
+  <!-- ROLE REVEAL -->
+  <div id="screen-role" class="hidden">
+    <div id="role-card">
+      <div id="role-icon">🎭</div>
+      <div id="role-name">?</div>
+      <div id="role-desc"></div>
+      <div id="role-word"></div>
+    </div>
+    <button class="btn btn-red" onclick="readyUp()">✅ LISTO — HE VISTO MI ROL</button>
+  </div>
+
+  <!-- GAME -->
+  <div id="screen-game" class="hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div id="phase-badge">DISCUSIÓN</div>
+      <div id="timer-text">60</div>
+    </div>
+    <div id="timer-bar-wrap"><div id="timer-bar" style="width:100%"></div></div>
+
+    <div class="section">
+      <div class="section-title">JUGADORES</div>
+      <div id="players-vote-list"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">CHAT</div>
+      <div id="chat-log"></div>
+      <div id="chat-input-row">
+        <input id="chat-input" type="text" placeholder="Escribe..." maxlength="80" />
+        <button class="btn btn-gray" id="chat-send" onclick="sendChat()">→</button>
+      </div>
+    </div>
+
+    <div id="my-status-bar" style="text-align:center;font-size:14px;color:#888;margin-top:6px;"></div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="screen-result" class="hidden">
+    <div id="result-content" style="text-align:center;padding:10px;"></div>
+    <button class="btn btn-green" onclick="playAgain()" style="margin-top:10px">🔄 OTRA RONDA</button>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, update, push, remove }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDxMJXKfGJAngeSi-JbrtieIgyZZN5Q6P8",
+  authDomain: "billar-workadventure.firebaseapp.com",
+  databaseURL: "https://billar-workadventure-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "billar-workadventure",
+  storageBucket: "billar-workadventure.firebasestorage.app",
+  messagingSenderId: "773546684259",
+  appId: "1:773546684259:web:034a2dcd3702d8b5766d56"
+};
+
+const fbApp = initializeApp(firebaseConfig, 'asesino');
+const db = getDatabase(fbApp);
+
+// ── WORD PAIRS: [civilian word, assassin word] ──
+const WORD_PAIRS = [
+  ['Perro','Lobo'],['Playa','Piscina'],['Pizza','Hamburguesa'],['Café','Té'],
+  ['Avión','Helicóptero'],['Castillo','Palacio'],['Guitarra','Violín'],['Nieve','Hielo'],
+  ['Tigre','León'],['Sushi','Sashimi'],['Bicicleta','Patinete'],['Champán','Cava'],
+  ['Película','Serie'],['Montaña','Colina'],['Murciélago','Búho'],['Espada','Lanza'],
+  ['Pulpo','Calamar'],['Chocolate','Caramelo'],['Barco','Yate'],['Bosque','Selva'],
+  ['Médico','Enfermero'],['Magia','Ilusionismo'],['Fútbol','Rugby'],['Piano','Órgano'],
+];
+
+let myId = 'a_' + Math.random().toString(36).substr(2,8);
+let myName = '';
+let roomId = null;
+let isHost = false;
+let myRole = null; // 'civilian' | 'assassin'
+let myWord = '';
+let timerInterval = null;
+let timerVal = 60;
+let myVote = null;
+let hasVoted = false;
+let players = {};
+let votes = {};
+let phase = 'lobby';
+
+// ── LOBBY ──
+window.createRoom = () => {
+  myName = document.getElementById('name-input').value.trim() || 'Jugador';
+  roomId = Math.random().toString(36).substr(2,4).toUpperCase();
+  isHost = true;
+  set(ref(db, `ase/${roomId}`), {
+    host: myId,
+    phase: 'lobby',
+    players: { [myId]: { name: myName, alive: true, ready: false } },
+    votes: null, chat: null, roles: null
+  });
+  show('lobby-code-wrap'); show('lobby-players-list'); show('start-game-btn');
+  document.getElementById('lobby-code').textContent = roomId;
+  listenLobby();
+};
+
+window.joinRoom = () => {
+  myName = document.getElementById('name-input').value.trim() || 'Jugador';
+  const code = document.getElementById('join-code').value.trim().toUpperCase();
+  if (!code) return;
+  roomId = code;
+  get(ref(db,`ase/${roomId}`)).then(snap => {
+    if (!snap.exists()) { alert('Sala no encontrada'); return; }
+    update(ref(db,`ase/${roomId}/players`), { [myId]: { name: myName, alive: true, ready: false } });
+    show('lobby-players-list');
+    document.getElementById('lobby-status').textContent = '✅ Unido! Esperando al host...';
+    listenLobby();
+  });
+};
+
+function listenLobby() {
+  onValue(ref(db,`ase/${roomId}/players`), snap => {
+    if (!snap.exists()) return;
+    players = snap.val();
+    const names = Object.values(players).map(p=>p.name);
+    document.getElementById('lobby-names').textContent = names.join(' · ');
+  });
+  onValue(ref(db,`ase/${roomId}/phase`), snap => {
+    if (snap.val() === 'reveal') enterReveal();
+    if (snap.val() === 'discussion') enterDiscussion();
+    if (snap.val() === 'vote') enterVote();
+    if (snap.val() === 'result') enterResult();
+  });
+}
+
+window.startGame = () => {
+  if (!isHost) return;
+  get(ref(db,`ase/${roomId}/players`)).then(snap => {
+    players = snap.val() || {};
+    const ids = Object.keys(players);
+    if (ids.length < 3) { alert('Necesitas al menos 3 jugadores'); return; }
+
+    // Assign roles: 1 assassin, rest civilians
+    const pair = WORD_PAIRS[Math.floor(Math.random()*WORD_PAIRS.length)];
+    const shuffled = [...ids].sort(()=>Math.random()-0.5);
+    const assassinId = shuffled[0];
+    const roles = {};
+    ids.forEach(id => {
+      roles[id] = { role: id === assassinId ? 'assassin' : 'civilian', word: id === assassinId ? pair[1] : pair[0] };
+    });
+    update(ref(db,`ase/${roomId}`), { phase:'reveal', roles, votes:null });
+  });
+};
+
+// ── ROLE REVEAL ──
+function enterReveal() {
+  showScreen('screen-role');
+  get(ref(db,`ase/${roomId}/roles/${myId}`)).then(snap => {
+    if (!snap.exists()) return;
+    const data = snap.val();
+    myRole = data.role;
+    myWord = data.word;
+    const card = document.getElementById('role-card');
+    if (myRole === 'assassin') {
+      card.style.borderColor = '#cc0000';
+      card.style.boxShadow = '0 0 20px #cc000044';
+      document.getElementById('role-icon').textContent = '🗡️';
+      document.getElementById('role-name').textContent = '¡ERES EL ASESINO!';
+      document.getElementById('role-name').style.color = '#cc0000';
+      document.getElementById('role-desc').textContent = 'Tu palabra es diferente a la de los demás. Adivina la palabra de los civiles y no te descubran.';
+    } else {
+      card.style.borderColor = '#44ff88';
+      card.style.boxShadow = '0 0 20px #44ff8844';
+      document.getElementById('role-icon').textContent = '👤';
+      document.getElementById('role-name').textContent = 'ERES CIVIL';
+      document.getElementById('role-name').style.color = '#44ff88';
+      document.getElementById('role-desc').textContent = 'Describe tu palabra sin decirla directamente. Encuentra al asesino.';
+    }
+    document.getElementById('role-word').textContent = `Tu palabra: "${myWord}"`;
+  });
+}
+
+window.readyUp = () => {
+  update(ref(db,`ase/${roomId}/players/${myId}`), { ready: true });
+  document.querySelector('#screen-role button').disabled = true;
+  document.querySelector('#screen-role button').textContent = '⏳ ESPERANDO...';
+  // Host watches for all ready
+  if (isHost) {
+    onValue(ref(db,`ase/${roomId}/players`), snap => {
+      const ps = snap.val() || {};
+      const all = Object.values(ps).every(p => p.ready);
+      if (all) update(ref(db,`ase/${roomId}`), { phase: 'discussion' });
+    });
+  }
+};
+
+// ── DISCUSSION ──
+function enterDiscussion() {
+  showScreen('screen-game');
+  document.getElementById('phase-badge').textContent = '💬 DISCUSIÓN';
+  document.getElementById('phase-badge').style.borderColor = '#44aaff';
+  document.getElementById('phase-badge').style.color = '#44aaff';
+  document.getElementById('my-status-bar').textContent = `Tu palabra: "${myWord}" · Rol: ${myRole === 'assassin' ? '🗡️ ASESINO' : '👤 CIVIL'}`;
+  startTimer(90, () => { if (isHost) update(ref(db,`ase/${roomId}`),{phase:'vote'}); });
+  listenGame();
+  push(ref(db,`ase/${roomId}/chat`), { text:'🎮 ¡Empieza la discusión! Cada uno da una pista de su palabra.', type:'system' });
+}
+
+// ── VOTE ──
+function enterVote() {
+  stopTimer();
+  showScreen('screen-game');
+  document.getElementById('phase-badge').textContent = '🗳️ VOTACIÓN';
+  document.getElementById('phase-badge').style.borderColor = '#ffdd00';
+  document.getElementById('phase-badge').style.color = '#ffdd00';
+  hasVoted = false; myVote = null;
+  startTimer(30, () => { if (isHost) tallyVotes(); });
+  push(ref(db,`ase/${roomId}/chat`), { text:'🗳️ ¡Hora de votar! ¿Quién es el asesino?', type:'system' });
+  renderPlayers(true);
+}
+
+function tallyVotes() {
+  get(ref(db,`ase/${roomId}/votes`)).then(snap => {
+    const vs = snap.val() || {};
+    const count = {};
+    Object.values(vs).forEach(v => { count[v] = (count[v]||0)+1; });
+    const sorted = Object.entries(count).sort((a,b)=>b[1]-a[1]);
+    const eliminated = sorted[0]?.[0];
+    update(ref(db,`ase/${roomId}`), { phase:'result', eliminated });
+  });
+}
+
+window.castVote = (targetId) => {
+  if (hasVoted) return;
+  hasVoted = true;
+  update(ref(db,`ase/${roomId}/votes`), { [myId]: targetId });
+  push(ref(db,`ase/${roomId}/chat`), { text:`${myName} ha votado.`, type:'vote' });
+  renderPlayers(true);
+};
+
+// ── RESULT ──
+function enterResult() {
+  stopTimer();
+  showScreen('screen-result');
+  get(ref(db,`ase/${roomId}`)).then(snap => {
+    const data = snap.val() || {};
+    const eliminated = data.eliminated;
+    const roles = data.roles || {};
+    const eliminatedPlayer = players[eliminated];
+    const eliminatedRole = roles[eliminated]?.role;
+    const assassin = Object.entries(roles).find(([,r])=>r.role==='assassin');
+    const assassinName = players[assassin?.[0]]?.name || '?';
+    const assassinWord = assassin?.[1]?.word || '?';
+    const civilWord = Object.values(roles).find(r=>r.role==='civilian')?.word || '?';
+
+    let html = '';
+    if (eliminatedRole === 'assassin') {
+      html = `<div style="font-size:40px">🎉</div>
+              <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:#44ff88;margin:10px 0">¡CIVILES GANAN!</div>
+              <div style="font-size:17px;color:#bbb">Eliminasteis a <span style="color:#ff4444">${eliminatedPlayer?.name}</span><br>que era el <span style="color:#cc0000">ASESINO 🗡️</span></div>`;
+    } else {
+      html = `<div style="font-size:40px">🗡️</div>
+              <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:#cc0000;margin:10px 0">¡ASESINO GANA!</div>
+              <div style="font-size:17px;color:#bbb">Eliminasteis a <span style="color:#44ff88">${eliminatedPlayer?.name}</span><br>que era CIVIL 😔<br>El asesino era <span style="color:#ff4444">${assassinName}</span></div>`;
+    }
+    html += `<div style="margin-top:14px;background:#0a0a0a;padding:10px;border:1px solid #333;font-size:16px;">
+              Palabra de civiles: <span style="color:#ffdd00">${civilWord}</span><br>
+              Palabra del asesino: <span style="color:#cc0000">${assassinWord}</span>
+            </div>`;
+    document.getElementById('result-content').innerHTML = html;
+  });
+}
+
+window.playAgain = () => {
+  update(ref(db,`ase/${roomId}`), {
+    phase:'lobby', roles:null, votes:null, eliminated:null
+  });
+  // Reset ready
+  get(ref(db,`ase/${roomId}/players`)).then(snap => {
+    const ps = snap.val() || {};
+    const updates = {};
+    Object.keys(ps).forEach(id => { updates[`${id}/ready`] = false; });
+    update(ref(db,`ase/${roomId}/players`), updates);
+  });
+  showScreen('screen-lobby');
+  show('lobby-players-list');
+  if (isHost) show('start-game-btn');
+};
+
+// ── GAME LISTENERS ──
+function listenGame() {
+  onValue(ref(db,`ase/${roomId}/players`), snap => {
+    if (!snap.exists()) return;
+    players = snap.val();
+    renderPlayers(phase === 'vote');
+  });
+  onValue(ref(db,`ase/${roomId}/chat`), snap => {
+    if (!snap.exists()) return;
+    const msgs = snap.val();
+    const arr = Array.isArray(msgs) ? msgs : Object.values(msgs);
+    const log = document.getElementById('chat-log');
+    log.innerHTML = '';
+    arr.slice(-20).forEach(m => {
+      const p = document.createElement('p');
+      p.className = m.type || '';
+      p.textContent = m.text;
+      log.appendChild(p);
+    });
+    log.scrollTop = log.scrollHeight;
+  });
+  onValue(ref(db,`ase/${roomId}/votes`), snap => {
+    votes = snap.val() || {};
+    renderPlayers(true);
+  });
+}
+
+function renderPlayers(showVoteBtn) {
+  const list = document.getElementById('players-vote-list');
+  list.innerHTML = '';
+  Object.entries(players).forEach(([id, p]) => {
+    const row = document.createElement('div');
+    row.className = 'player-row';
+    const voteCount = Object.values(votes).filter(v=>v===id).length;
+    row.innerHTML = `
+      <span class="${id===myId?'player-host':'player-alive'}">${p.name}${id===myId?' (tú)':''}</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="vote-count">${voteCount > 0 ? '🗳️'.repeat(Math.min(voteCount,5)) : ''}</span>
+        ${showVoteBtn && id !== myId && !hasVoted ? `<button class="vote-btn" onclick="castVote('${id}')">VOTAR</button>` : ''}
+      </div>`;
+    list.appendChild(row);
+  });
+}
+
+window.sendChat = () => {
+  const input = document.getElementById('chat-input');
+  const txt = input.value.trim();
+  input.value = '';
+  if (!txt) return;
+  push(ref(db,`ase/${roomId}/chat`), { text:`${myName}: ${txt}` });
+};
+document.getElementById('chat-input').addEventListener('keydown', e => { if(e.key==='Enter') window.sendChat(); });
+
+// ── TIMER ──
+function startTimer(secs, onEnd) {
+  stopTimer();
+  timerVal = secs;
+  document.getElementById('timer-text').textContent = secs;
+  document.getElementById('timer-bar').style.width = '100%';
+  timerInterval = setInterval(() => {
+    timerVal--;
+    document.getElementById('timer-text').textContent = timerVal;
+    document.getElementById('timer-bar').style.width = (timerVal/secs*100)+'%';
+    document.getElementById('timer-text').style.color = timerVal <= 10 ? '#ff2244' : '#cc0000';
+    if (timerVal <= 0) { stopTimer(); onEnd(); }
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerInterval); timerInterval = null; }
+
+// ── HELPERS ──
+function show(id) { document.getElementById(id).classList.remove('hidden'); }
+function showScreen(id) {
+  ['screen-lobby','screen-role','screen-game','screen-result'].forEach(s => {
+    document.getElementById(s).classList.add('hidden');
+  });
+  document.getElementById(id).classList.remove('hidden');
+}
+</script>
+</body>
+</html>

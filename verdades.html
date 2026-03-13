@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>🤥 2 Verdades 1 Mentira</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0f0a1a; font-family:'VT323',monospace; color:#fff; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:10px; }
+  h1 { font-family:'Press Start 2P',monospace; font-size:9px; color:#cc44ff; text-shadow:0 0 15px #cc44ff; margin-bottom:10px; letter-spacing:2px; text-align:center; }
+  .btn { font-family:'Press Start 2P',monospace; font-size:8px; padding:10px 16px; border:2px solid; background:transparent; cursor:pointer; transition:all 0.15s; }
+  .btn:hover { filter:brightness(1.4); }
+  .btn-purple { color:#cc44ff; border-color:#cc44ff; }
+  .btn-purple:hover { background:#cc44ff22; }
+  .btn-green { color:#44ffaa; border-color:#44ffaa; }
+  .btn-green:hover { background:#44ffaa22; }
+  .btn-gray { color:#aaa; border-color:#aaa; }
+  .btn-gray:hover { background:#aaaaaa22; }
+  .btn-red { color:#ff4466; border-color:#ff4466; }
+  .btn-red:hover { background:#ff446622; }
+  input[type=text], textarea { background:#0a0818; border:2px solid #ffffff22; color:#fff; font-family:'VT323',monospace; font-size:18px; padding:8px 12px; outline:none; }
+  input:focus, textarea:focus { border-color:#cc44ff; }
+  textarea { resize:none; width:100%; }
+  .code-display { font-family:'Press Start 2P',monospace; font-size:22px; color:#cc44ff; text-shadow:0 0 15px #cc44ff; letter-spacing:6px; text-align:center; }
+  .lbl { font-size:14px; color:#ffffff44; text-align:center; }
+  #lobby { position:fixed; inset:0; background:#0f0a1a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; z-index:10; }
+  #app { width:540px; }
+  .box { background:#140a1f; border:2px solid #cc44ff33; padding:12px; border-radius:4px; margin-bottom:10px; }
+  .box h3 { font-family:'Press Start 2P',monospace; font-size:7px; color:#cc44ff; margin-bottom:8px; }
+
+  /* Statement cards */
+  .statement-card {
+    border:2px solid #ffffff22;
+    padding:12px;
+    margin-bottom:8px;
+    border-radius:4px;
+    cursor:pointer;
+    transition:all 0.15s;
+    font-size:18px;
+    line-height:1.5;
+    position:relative;
+  }
+  .statement-card:hover { border-color:#cc44ff; background:#cc44ff11; }
+  .statement-card.voted { border-color:#cc44ff; background:#cc44ff22; }
+  .statement-card.revealed-lie { border-color:#ff4466; background:#ff446622; }
+  .statement-card.revealed-truth { border-color:#44ffaa; background:#44ffaa11; }
+  .statement-num { font-family:'Press Start 2P',monospace; font-size:7px; color:#cc44ff; display:block; margin-bottom:4px; }
+  .vote-indicator { font-size:12px; color:#cc44ff; margin-top:4px; }
+
+  /* Player writing */
+  .writing-input { width:100%; margin-bottom:6px; font-size:17px; line-height:1.4; height:54px; }
+  .writing-label { font-family:'Press Start 2P',monospace; font-size:6px; color:#888; margin-bottom:4px; display:block; }
+
+  .player-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #ffffff0a; font-size:15px; }
+  .player-row .pts { font-family:'Press Start 2P',monospace; font-size:7px; color:#cc44ff; }
+  .ready-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+
+  #chat-log { height:70px; overflow-y:auto; font-size:14px; line-height:1.6; }
+  #chat-log p { color:#888; }
+  #chat-log p.system { color:#cc44ff; font-size:12px; }
+  #chat-log p.win { color:#44ffaa; }
+  #chat-input-row { display:flex; gap:6px; margin-top:6px; }
+  #chat-input { flex:1; font-size:15px; text-align:left; }
+  #chat-send { font-family:'Press Start 2P',monospace; font-size:6px; padding:6px 10px; border:2px solid #cc44ff; color:#cc44ff; background:transparent; cursor:pointer; }
+
+  #status-msg { font-family:'Press Start 2P',monospace; font-size:8px; text-align:center; min-height:20px; color:#ffdd00; margin-bottom:6px; }
+  #phase-title { font-family:'Press Start 2P',monospace; font-size:9px; text-align:center; color:#cc44ff; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<div id="lobby">
+  <h1>🤥 2 VERDADES<br>1 MENTIRA</h1>
+  <div class="lbl">CADA UNO ESCRIBE 2 VERDADES<br>Y 1 MENTIRA · TODOS ADIVINAN</div>
+  <input id="name-input" type="text" placeholder="TU NOMBRE" maxlength="16" style="width:240px;text-align:center;" />
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+    <button class="btn btn-purple" onclick="createRoom()">🆕 CREAR</button>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <input id="join-code" type="text" maxlength="4" placeholder="CÓDIGO" style="width:90px;font-size:15px;" oninput="this.value=this.value.toUpperCase()"/>
+      <button class="btn btn-gray" onclick="joinRoom()">▶ UNIRSE</button>
+    </div>
+  </div>
+  <div id="lobby-code-wrap" style="display:none;text-align:center">
+    <div class="lbl">CÓDIGO:</div>
+    <div class="code-display" id="lobby-code"></div>
+  </div>
+  <div id="lobby-info" class="lbl"></div>
+  <button id="lobby-start" class="btn btn-green" style="display:none;" onclick="startGame()">▶ EMPEZAR</button>
+</div>
+
+<div id="app">
+  <h1>🤥 2 VERDADES 1 MENTIRA</h1>
+  <div id="phase-title"></div>
+  <div id="status-msg"></div>
+
+  <!-- WRITING PHASE -->
+  <div id="phase-writing" style="display:none;">
+    <div class="box">
+      <h3>✍️ ESCRIBE TUS FRASES</h3>
+      <span class="writing-label">VERDAD 1:</span>
+      <textarea id="t1" class="writing-input" placeholder="Algo verdadero sobre ti..."></textarea>
+      <span class="writing-label">VERDAD 2:</span>
+      <textarea id="t2" class="writing-input" placeholder="Otra cosa verdadera..."></textarea>
+      <span class="writing-label">MENTIRA:</span>
+      <textarea id="t3" class="writing-input" placeholder="Una mentira convincente..."></textarea>
+      <button class="btn btn-green" style="width:100%;margin-top:8px;" onclick="submitStatements()">✅ LISTO</button>
+    </div>
+    <div class="box">
+      <h3>👥 ESPERANDO</h3>
+      <div id="waiting-list"></div>
+    </div>
+  </div>
+
+  <!-- GUESSING PHASE -->
+  <div id="phase-guessing" style="display:none;">
+    <div class="box" id="current-player-box">
+      <h3 id="current-player-label">TURNO DE...</h3>
+      <div id="statements-list"></div>
+    </div>
+    <div class="box">
+      <h3>🏆 PUNTUACIÓN</h3>
+      <div id="score-list"></div>
+    </div>
+  </div>
+
+  <!-- CHAT always -->
+  <div class="box">
+    <h3>💬 CHAT</h3>
+    <div id="chat-log"></div>
+    <div id="chat-input-row">
+      <input id="chat-input" type="text" placeholder="Comenta..." maxlength="60" />
+      <button id="chat-send" onclick="sendChat()">→</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, update, push } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDxMJXKfGJAngeSi-JbrtieIgyZZN5Q6P8",
+  authDomain: "billar-workadventure.firebaseapp.com",
+  databaseURL: "https://billar-workadventure-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "billar-workadventure",
+  storageBucket: "billar-workadventure.firebasestorage.app",
+  messagingSenderId: "773546684259",
+  appId: "1:773546684259:web:034a2dcd3702d8b5766d56"
+};
+
+const fbApp = initializeApp(firebaseConfig, 'verdades');
+const db = getDatabase(fbApp);
+
+let myId = 'v_' + Math.random().toString(36).substr(2,8);
+let myName = '';
+let roomId = null;
+let isHost = false;
+let players = {};
+let myVote = null;
+let hasVoted = false;
+
+window.createRoom = () => {
+  myName = document.getElementById('name-input').value.trim() || 'Jugador';
+  roomId = Math.random().toString(36).substr(2,4).toUpperCase();
+  isHost = true;
+  set(ref(db,`verd/${roomId}`), {
+    host:myId, phase:'lobby', turnIdx:0, chat:null,
+    players:{ [myId]:{ name:myName, score:0, ready:false } }
+  });
+  document.getElementById('lobby-code-wrap').style.display='block';
+  document.getElementById('lobby-code').textContent=roomId;
+  document.getElementById('lobby-start').style.display='block';
+  listenLobby();
+};
+
+window.joinRoom = () => {
+  myName = document.getElementById('name-input').value.trim() || 'Jugador';
+  const code = document.getElementById('join-code').value.trim().toUpperCase();
+  if (!code) return;
+  roomId = code;
+  get(ref(db,`verd/${roomId}`)).then(snap => {
+    if (!snap.exists()) { alert('Sala no encontrada'); return; }
+    update(ref(db,`verd/${roomId}/players`), { [myId]:{ name:myName, score:0, ready:false } });
+    document.getElementById('lobby-info').textContent='✅ Unido!';
+    listenLobby();
+  });
+};
+
+function listenLobby() {
+  onValue(ref(db,`verd/${roomId}/players`), snap => {
+    if (!snap.exists()) return;
+    players = snap.val();
+    document.getElementById('lobby-info').textContent=`👥 ${Object.keys(players).length}: ${Object.values(players).map(p=>p.name).join(', ')}`;
+  });
+  onValue(ref(db,`verd/${roomId}/phase`), snap => {
+    if (snap.val()==='writing') enterWriting();
+    if (snap.val()==='guessing') enterGuessing();
+    if (snap.val()==='gameover') enterGameover();
+  });
+}
+
+window.startGame = () => update(ref(db,`verd/${roomId}`),{phase:'writing'});
+
+function enterWriting() {
+  document.getElementById('lobby').style.display='none';
+  document.getElementById('phase-writing').style.display='block';
+  document.getElementById('phase-guessing').style.display='none';
+  document.getElementById('phase-title').textContent='✍️ ESCRIBE TUS FRASES';
+  listenWriting();
+}
+
+function listenWriting() {
+  onValue(ref(db,`verd/${roomId}/players`), snap => {
+    if (!snap.exists()) return;
+    players = snap.val();
+    const wl = document.getElementById('waiting-list');
+    wl.innerHTML = '';
+    Object.values(players).forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'player-row';
+      row.innerHTML = `<span><span class="ready-dot" style="background:${p.ready?'#44ffaa':'#444'}"></span>${p.name}</span><span style="font-size:13px;color:${p.ready?'#44ffaa':'#666'}">${p.ready?'LISTO':'...'}</span>`;
+      wl.appendChild(row);
+    });
+    // All ready → move to guessing
+    const all = Object.values(players).every(p=>p.ready);
+    if (all && isHost) update(ref(db,`verd/${roomId}`),{phase:'guessing', turnIdx:0});
+  });
+}
+
+window.submitStatements = () => {
+  const t1 = document.getElementById('t1').value.trim();
+  const t2 = document.getElementById('t2').value.trim();
+  const lie = document.getElementById('t3').value.trim();
+  if (!t1||!t2||!lie) { document.getElementById('status-msg').textContent='Rellena todas las frases'; return; }
+  // Shuffle statements
+  const stmts = [{text:t1,isLie:false},{text:t2,isLie:false},{text:lie,isLie:true}].sort(()=>Math.random()-0.5);
+  update(ref(db,`verd/${roomId}/statements`), { [myId]: stmts });
+  update(ref(db,`verd/${roomId}/players/${myId}`), { ready:true });
+  document.getElementById('status-msg').textContent='✅ Enviado! Esperando a los demás...';
+};
+
+function enterGuessing() {
+  document.getElementById('phase-writing').style.display='none';
+  document.getElementById('phase-guessing').style.display='block';
+  listenGuessing();
+}
+
+function listenGuessing() {
+  onValue(ref(db,`verd/${roomId}`), snap => {
+    if (!snap.exists()) return;
+    const data = snap.val();
+    players = data.players || {};
+    const order = Object.keys(players);
+    const idx = data.turnIdx || 0;
+    if (idx >= order.length) { if(isHost) update(ref(db,`verd/${roomId}`),{phase:'gameover'}); return; }
+    const currentId = order[idx];
+    const stmts = data.statements?.[currentId] || [];
+    const votes = data.votes || {};
+    const revealed = data.revealed || false;
+    hasVoted = !!votes[myId];
+
+    const isMe = currentId === myId;
+    document.getElementById('phase-title').textContent = isMe ? '👀 ¡TUS FRASES ESTÁN EN JUEGO!' : `🤔 ADIVINA LA MENTIRA DE ${players[currentId]?.name?.toUpperCase()||'?'}`;
+    document.getElementById('current-player-label').textContent = `✍️ FRASES DE ${players[currentId]?.name||'?'}`;
+
+    renderStatements(stmts, votes, revealed, currentId, isMe, data, idx, order);
+    renderScores(players);
+  });
+
+  onValue(ref(db,`verd/${roomId}/chat`), snap => {
+    if (!snap.exists()) return;
+    const msgs = snap.val();
+    const arr = Array.isArray(msgs)?msgs:Object.values(msgs);
+    const log = document.getElementById('chat-log');
+    log.innerHTML = '';
+    arr.slice(-20).forEach(m => { const p=document.createElement('p'); p.className=m.type||''; p.textContent=m.text; log.appendChild(p); });
+    log.scrollTop = log.scrollHeight;
+  });
+}
+
+function renderStatements(stmts, votes, revealed, currentId, isMe, data, idx, order) {
+  const list = document.getElementById('statements-list');
+  list.innerHTML = '';
+  if (!stmts.length) return;
+
+  stmts.forEach((s, i) => {
+    const card = document.createElement('div');
+    card.className = 'statement-card';
+    if (revealed) {
+      card.className += s.isLie ? ' revealed-lie' : ' revealed-truth';
+    } else if (!isMe && !hasVoted) {
+      card.onclick = () => vote(i, currentId, stmts, data, idx, order);
+    }
+    const myVoteHere = data.votes?.[myId] === i;
+    if (myVoteHere && !revealed) card.className += ' voted';
+
+    const voteCount = Object.values(votes||{}).filter(v=>v===i).length;
+    card.innerHTML = `<span class="statement-num">FRASE ${i+1} ${revealed?(s.isLie?'🤥 MENTIRA':'✅ VERDAD'):''}</span>${s.text}${voteCount>0?`<div class="vote-indicator">${'🗳️'.repeat(Math.min(voteCount,8))} (${voteCount})</div>`:''}`;
+    list.appendChild(card);
+  });
+
+  if (revealed && isHost) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-purple'; btn.style.width='100%'; btn.style.marginTop='8px';
+    btn.textContent = idx+1 < order.length ? '▶ SIGUIENTE JUGADOR' : '🏆 VER RESULTADOS';
+    btn.onclick = () => {
+      update(ref(db,`verd/${roomId}`),{ turnIdx:idx+1, votes:null, revealed:false });
+    };
+    list.appendChild(btn);
+  }
+
+  if (!revealed && isHost && Object.keys(votes||{}).length >= Object.keys(players).length - 1) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-red'; btn.style.width='100%'; btn.style.marginTop='8px';
+    btn.textContent = '👁️ REVELAR MENTIRA';
+    btn.onclick = () => revealLie(stmts, currentId, data.votes||{});
+    list.appendChild(btn);
+  }
+}
+
+function vote(stmtIdx, currentId, stmts, data, idx, order) {
+  if (hasVoted || currentId === myId) return;
+  hasVoted = true;
+  update(ref(db,`verd/${roomId}/votes`), { [myId]: stmtIdx });
+  push(ref(db,`verd/${roomId}/chat`),{text:`${myName} ha votado.`});
+}
+
+function revealLie(stmts, currentId, votes) {
+  const lieIdx = stmts.findIndex(s=>s.isLie);
+  const updatedPlayers = {...players};
+  Object.entries(votes).forEach(([id,v]) => {
+    if (v === lieIdx && id !== currentId) {
+      updatedPlayers[id] = {...updatedPlayers[id], score:(updatedPlayers[id]?.score||0)+2};
+    }
+  });
+  // Bonus for current player if nobody guessed
+  const guessedLie = Object.values(votes).filter(v=>v===lieIdx).length;
+  if (guessedLie === 0) {
+    updatedPlayers[currentId] = {...updatedPlayers[currentId], score:(updatedPlayers[currentId]?.score||0)+3};
+  }
+  update(ref(db,`verd/${roomId}`),{ revealed:true, players:updatedPlayers });
+  push(ref(db,`verd/${roomId}/chat`),{text:`🤥 La mentira era: "${stmts[lieIdx].text}"`,type:'system'});
+}
+
+function renderScores(ps) {
+  const list = document.getElementById('score-list');
+  list.innerHTML = '';
+  Object.entries(ps).sort((a,b)=>(b[1].score||0)-(a[1].score||0)).forEach(([id,p]) => {
+    const row = document.createElement('div');
+    row.className = 'player-row';
+    row.innerHTML = `<span style="color:${id===myId?'#cc44ff':'#ddd'}">${p.name}${id===myId?' (tú)':''}</span><span class="pts">${p.score||0}pts</span>`;
+    list.appendChild(row);
+  });
+}
+
+function enterGameover() {
+  document.getElementById('phase-title').textContent='🏆 FIN DEL JUEGO';
+  get(ref(db,`verd/${roomId}/players`)).then(snap => {
+    const ps = snap.val() || {};
+    const sorted = Object.entries(ps).sort((a,b)=>(b[1].score||0)-(a[1].score||0));
+    const winner = sorted[0];
+    document.getElementById('status-msg').textContent=`🏆 GANA ${winner[1].name.toUpperCase()} CON ${winner[1].score||0} PTS!`;
+    push(ref(db,`verd/${roomId}/chat`),{text:`🏆 ¡${winner[1].name} gana con ${winner[1].score||0} puntos!`,type:'win'});
+  });
+}
+
+window.sendChat = () => {
+  const input = document.getElementById('chat-input');
+  const txt = input.value.trim(); input.value='';
+  if (!txt) return;
+  push(ref(db,`verd/${roomId}/chat`),{text:`${myName}: ${txt}`});
+};
+document.getElementById('chat-input').addEventListener('keydown', e => { if(e.key==='Enter') window.sendChat(); });
+</script>
+</body>
+</html>

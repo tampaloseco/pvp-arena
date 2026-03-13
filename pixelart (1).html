@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>🎨 Pixel Art Colaborativo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#0d0d1a;
+    font-family:'VT323',monospace;
+    color:#fff;
+    height:100vh;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+  }
+  h1 { font-family:'Press Start 2P',monospace; font-size:11px; color:#ff44aa; text-shadow:0 0 15px #ff44aa; margin-bottom:8px; letter-spacing:2px; }
+
+  #main { display:flex; gap:12px; align-items:flex-start; }
+
+  /* Canvas */
+  #canvas-wrap { position:relative; }
+  #pixel-canvas {
+    display:block;
+    border:3px solid #ff44aa44;
+    border-radius:4px;
+    cursor:crosshair;
+    image-rendering:pixelated;
+  }
+
+  /* Toolbar */
+  #toolbar {
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:6px;
+    flex-wrap:wrap;
+  }
+  .color-swatch {
+    width:22px; height:22px;
+    border:3px solid transparent;
+    border-radius:3px;
+    cursor:pointer;
+    transition:transform 0.1s;
+    flex-shrink:0;
+  }
+  .color-swatch.selected { border-color:#fff; transform:scale(1.25); }
+  #brush-size { width:70px; accent-color:#ff44aa; }
+  .tbtn {
+    font-family:'Press Start 2P',monospace;
+    font-size:7px;
+    padding:6px 10px;
+    border:2px solid;
+    background:transparent;
+    cursor:pointer;
+    transition:all 0.15s;
+  }
+  .tbtn:hover { filter:brightness(1.4); }
+  .tbtn-pink { color:#ff44aa; border-color:#ff44aa; }
+  .tbtn-pink:hover { background:#ff44aa22; }
+  .tbtn-gray { color:#aaa; border-color:#aaa; }
+  .tbtn-gray:hover { background:#aaaaaa22; }
+
+  /* Panel */
+  #panel {
+    width:200px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .panel-box {
+    background:#111122;
+    border:2px solid #ff44aa33;
+    border-radius:4px;
+    padding:10px;
+  }
+  .panel-box h3 { font-family:'Press Start 2P',monospace; font-size:7px; color:#ff44aa; margin-bottom:8px; }
+
+  /* Players online */
+  #players-list { font-size:15px; line-height:1.8; }
+  .player-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+
+  /* Theme vote */
+  #theme-wrap input {
+    background:#0a0a18;
+    border:2px solid #ff44aa44;
+    color:#fff;
+    font-family:'VT323',monospace;
+    font-size:16px;
+    padding:5px 8px;
+    width:100%;
+    outline:none;
+    margin-bottom:6px;
+  }
+  #theme-wrap input:focus { border-color:#ff44aa; }
+  #current-theme { color:#ffdd44; font-size:16px; margin-top:4px; word-break:break-word; }
+
+  /* Chat */
+  #chat-log {
+    height:100px;
+    overflow-y:auto;
+    font-size:14px;
+    line-height:1.6;
+    margin-bottom:6px;
+  }
+  #chat-log p { color:#bbb; }
+  #chat-log p.system { color:#ff44aa; font-size:12px; }
+  #chat-input-wrap { display:flex; gap:4px; }
+  #chat-input {
+    flex:1;
+    background:#0a0a18;
+    border:2px solid #ff44aa33;
+    color:#fff;
+    font-family:'VT323',monospace;
+    font-size:15px;
+    padding:4px 6px;
+    outline:none;
+  }
+  #chat-input:focus { border-color:#ff44aa; }
+  #chat-send {
+    background:#ff44aa22;
+    border:2px solid #ff44aa;
+    color:#ff44aa;
+    font-family:'Press Start 2P',monospace;
+    font-size:6px;
+    padding:0 8px;
+    cursor:pointer;
+  }
+
+  /* Lobby overlay */
+  #lobby {
+    position:fixed; inset:0;
+    background:rgba(0,0,0,0.92);
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    gap:14px; z-index:10;
+  }
+  #lobby h1 { font-size:14px; }
+  #lobby input {
+    background:#0a0a18;
+    border:2px solid #ff44aa66;
+    color:#fff;
+    font-family:'VT323',monospace;
+    font-size:20px;
+    padding:8px 14px;
+    width:240px;
+    text-align:center;
+    outline:none;
+  }
+  #lobby input:focus { border-color:#ff44aa; }
+  .lobby-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center; }
+  #lobby-code-display { font-family:'Press Start 2P',monospace; font-size:22px; color:#ff44aa; text-shadow:0 0 15px #ff44aa; letter-spacing:4px; }
+  #lobby-info { color:#ffffff55; font-size:14px; text-align:center; }
+</style>
+</head>
+<body>
+
+<!-- LOBBY -->
+<div id="lobby">
+  <h1>🎨 PIXEL ART<br>COLABORATIVO</h1>
+  <div style="color:#ff44aa88;font-size:15px;text-align:center">TODOS DIBUJAN EN EL MISMO LIENZO</div>
+  <input id="name-input" type="text" maxlength="16" placeholder="TU NOMBRE" />
+  <div class="lobby-row">
+    <button class="tbtn tbtn-pink" onclick="createRoom()">🆕 CREAR SALA</button>
+  </div>
+  <div class="lobby-row">
+    <input id="join-code" type="text" maxlength="4" placeholder="CÓDIGO" style="width:90px;font-size:16px;padding:6px 8px;" oninput="this.value=this.value.toUpperCase()"/>
+    <button class="tbtn tbtn-gray" onclick="joinRoom()">▶ UNIRSE</button>
+  </div>
+  <div id="lobby-code-wrap" style="display:none;text-align:center">
+    <div style="color:#ff44aa88;font-size:13px;margin-bottom:4px">CÓDIGO DE SALA:</div>
+    <div id="lobby-code-display"></div>
+    <div style="color:#ffffff44;font-size:13px;margin-top:4px">COMPARTE ESTE CÓDIGO</div>
+  </div>
+  <div id="lobby-info"></div>
+  <button id="lobby-start" class="tbtn tbtn-pink" style="display:none" onclick="startRoom()">▶ EMPEZAR A DIBUJAR</button>
+</div>
+
+<!-- GAME -->
+<h1>🎨 PIXEL ART COLABORATIVO</h1>
+<div id="main">
+  <div id="canvas-wrap">
+    <canvas id="pixel-canvas" width="600" height="480"></canvas>
+    <div id="toolbar">
+      <div id="palette"></div>
+      <input type="range" id="brush-size" min="1" max="8" value="1" title="Tamaño pincel">
+      <button class="tbtn tbtn-gray" id="eraser-btn" onclick="toggleEraser()">⬜</button>
+      <button class="tbtn tbtn-pink" onclick="fillBucket()">🪣</button>
+      <button class="tbtn tbtn-gray" onclick="clearAll()">🗑</button>
+      <button class="tbtn tbtn-pink" onclick="downloadCanvas()">💾</button>
+    </div>
+  </div>
+  <div id="panel">
+    <div class="panel-box">
+      <h3>🎯 TEMA</h3>
+      <div id="theme-wrap">
+        <input id="theme-input" type="text" maxlength="40" placeholder="Propón un tema..." />
+        <button class="tbtn tbtn-pink" style="width:100%;font-size:6px;" onclick="setTheme()">✅ PROPONER</button>
+      </div>
+      <div id="current-theme">Sin tema</div>
+    </div>
+    <div class="panel-box">
+      <h3>👥 EN LÍNEA</h3>
+      <div id="players-list"></div>
+    </div>
+    <div class="panel-box" style="flex:1">
+      <h3>💬 CHAT</h3>
+      <div id="chat-log"></div>
+      <div id="chat-input-wrap">
+        <input id="chat-input" type="text" maxlength="60" placeholder="Mensaje..." />
+        <button id="chat-send" onclick="sendChat()">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, update, push, remove }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDxMJXKfGJAngeSi-JbrtieIgyZZN5Q6P8",
+  authDomain: "billar-workadventure.firebaseapp.com",
+  databaseURL: "https://billar-workadventure-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "billar-workadventure",
+  storageBucket: "billar-workadventure.firebasestorage.app",
+  messagingSenderId: "773546684259",
+  appId: "1:773546684259:web:034a2dcd3702d8b5766d56"
+};
+
+const fbApp = initializeApp(firebaseConfig, 'pixelart');
+const db = getDatabase(fbApp);
+
+// ── PALETTE ──
+const PALETTE = [
+  '#000000','#ffffff','#ff0000','#ff6600','#ffdd00','#00cc00',
+  '#0066ff','#9900ff','#ff44aa','#00cccc','#884400','#888888',
+  '#ffaaaa','#aaffaa','#aaaaff','#ffeeaa'
+];
+let currentColor = '#000000';
+let erasing = false;
+let brushSz = 1;
+const GRID = 60; // 60x48 grid on 600x480 canvas
+const CELL = 10; // 10px per cell
+
+// Build palette
+const paletteDiv = document.getElementById('palette');
+paletteDiv.style.display = 'flex';
+paletteDiv.style.flexWrap = 'wrap';
+paletteDiv.style.gap = '3px';
+paletteDiv.style.maxWidth = '200px';
+PALETTE.forEach(c => {
+  const btn = document.createElement('div');
+  btn.className = 'color-swatch' + (c === currentColor ? ' selected' : '');
+  btn.style.background = c;
+  if (c === '#ffffff') btn.style.outline = '1px solid #555';
+  btn.onclick = () => {
+    erasing = false;
+    currentColor = c;
+    document.querySelectorAll('.color-swatch').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    document.getElementById('eraser-btn').style.opacity = '1';
+  };
+  paletteDiv.appendChild(btn);
+});
+
+document.getElementById('brush-size').oninput = e => brushSz = +e.target.value;
+
+window.toggleEraser = () => {
+  erasing = !erasing;
+  document.getElementById('eraser-btn').style.opacity = erasing ? '0.4' : '1';
+};
+
+// ── PIXEL GRID ──
+const canvas = document.getElementById('pixel-canvas');
+const ctx = canvas.getContext('2d');
+let grid = {}; // key: "x,y" → color
+
+function drawGrid() {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Grid lines
+  ctx.strokeStyle = '#e0e0e0';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x <= GRID; x++) {
+    ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,canvas.height); ctx.stroke();
+  }
+  for (let y = 0; y <= 48; y++) {
+    ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(canvas.width,y*CELL); ctx.stroke();
+  }
+  // Pixels
+  Object.entries(grid).forEach(([key, color]) => {
+    const [gx, gy] = key.split(',').map(Number);
+    ctx.fillStyle = color;
+    ctx.fillRect(gx*CELL+1, gy*CELL+1, CELL-1, CELL-1);
+  });
+}
+
+function getCell(e) {
+  const r = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - r.left) / CELL);
+  const y = Math.floor((e.clientY - r.top) / CELL);
+  return [x, y];
+}
+
+function paintCell(gx, gy, color) {
+  if (gx < 0 || gx >= GRID || gy < 0 || gy >= 48) return;
+  const key = `${gx},${gy}`;
+  if (grid[key] === color) return;
+  grid[key] = color;
+  // Draw immediately
+  ctx.fillStyle = color;
+  ctx.fillRect(gx*CELL+1, gy*CELL+1, CELL-1, CELL-1);
+  // Push to firebase
+  const updates = {};
+  updates[`pix/${roomId}/pixels/${key.replace(',','_')}`] = color;
+  update(ref(db), updates);
+}
+
+let painting = false;
+canvas.addEventListener('mousedown', e => { painting = true; paint(e); });
+canvas.addEventListener('mousemove', e => { if (painting) paint(e); });
+canvas.addEventListener('mouseup', () => painting = false);
+canvas.addEventListener('mouseleave', () => painting = false);
+
+function paint(e) {
+  const [gx, gy] = getCell(e);
+  const color = erasing ? '#ffffff' : currentColor;
+  for (let dx = 0; dx < brushSz; dx++) {
+    for (let dy = 0; dy < brushSz; dy++) {
+      paintCell(gx+dx, gy+dy, color);
+    }
+  }
+}
+
+window.fillBucket = () => {
+  // Fill entire canvas with current color — use for background
+  if (!confirm('¿Rellenar todo el lienzo con este color?')) return;
+  for (let x = 0; x < GRID; x++) {
+    for (let y = 0; y < 48; y++) {
+      grid[`${x},${y}`] = currentColor;
+    }
+  }
+  drawGrid();
+  // Save all to firebase
+  const pixels = {};
+  Object.entries(grid).forEach(([k,v]) => { pixels[k.replace(',','_')] = v; });
+  update(ref(db, `pix/${roomId}`), { pixels });
+};
+
+window.clearAll = () => {
+  if (!confirm('¿Limpiar todo el lienzo?')) return;
+  grid = {};
+  drawGrid();
+  set(ref(db, `pix/${roomId}/pixels`), null);
+};
+
+window.downloadCanvas = () => {
+  // Render without grid lines
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width = canvas.width; tmpCanvas.height = canvas.height;
+  const tmpCtx = tmpCanvas.getContext('2d');
+  tmpCtx.fillStyle = '#fff';
+  tmpCtx.fillRect(0,0,tmpCanvas.width,tmpCanvas.height);
+  Object.entries(grid).forEach(([key, color]) => {
+    const [gx, gy] = key.split(',').map(Number);
+    tmpCtx.fillStyle = color;
+    tmpCtx.fillRect(gx*CELL, gy*CELL, CELL, CELL);
+  });
+  const a = document.createElement('a');
+  a.download = 'pixel-art.png';
+  a.href = tmpCanvas.toDataURL();
+  a.click();
+};
+
+// ── STATE ──
+let myId = 'u_' + Math.random().toString(36).substr(2,8);
+let myName = '';
+let roomId = null;
+let isHost = false;
+const PLAYER_COLORS = ['#ff44aa','#44ffaa','#ffdd44','#44aaff','#ff6644','#aa44ff','#44ffdd','#ff4444'];
+
+// ── LOBBY ──
+window.createRoom = () => {
+  myName = document.getElementById('name-input').value.trim() || 'Artista';
+  roomId = Math.random().toString(36).substr(2,4).toUpperCase();
+  isHost = true;
+  set(ref(db, `pix/${roomId}`), {
+    host: myId, theme: 'Sin tema', pixels: null, chat: null,
+    players: { [myId]: { name: myName, color: PLAYER_COLORS[0], online: true } }
+  });
+  document.getElementById('lobby-code-wrap').style.display = 'block';
+  document.getElementById('lobby-code-display').textContent = roomId;
+  document.getElementById('lobby-start').style.display = 'block';
+  document.getElementById('lobby-info').textContent = 'Esperando jugadores...';
+  listenPlayers();
+};
+
+window.joinRoom = () => {
+  myName = document.getElementById('name-input').value.trim() || 'Artista';
+  const code = document.getElementById('join-code').value.trim().toUpperCase();
+  if (!code) return;
+  roomId = code;
+  get(ref(db,`pix/${roomId}/players`)).then(snap => {
+    if (!snap.exists()) { alert('Sala no encontrada'); return; }
+    const count = Object.keys(snap.val()).length;
+    const color = PLAYER_COLORS[count % PLAYER_COLORS.length];
+    update(ref(db,`pix/${roomId}/players`), { [myId]: { name: myName, color, online: true } });
+    document.getElementById('lobby-start').style.display = 'block';
+    document.getElementById('lobby-info').textContent = '✅ Unido! Espera al host o empieza a dibujar.';
+    listenPlayers();
+    // If room already active, go straight in
+    get(ref(db,`pix/${roomId}/active`)).then(s => { if (s.val()) enterGame(); });
+  });
+};
+
+window.startRoom = () => {
+  update(ref(db,`pix/${roomId}`), { active: true });
+  enterGame();
+};
+
+function listenPlayers() {
+  onValue(ref(db,`pix/${roomId}/players`), snap => {
+    if (!snap.exists()) return;
+    const ps = snap.val();
+    document.getElementById('lobby-info').textContent = `👥 ${Object.keys(ps).length} jugadores: ${Object.values(ps).map(p=>p.name).join(', ')}`;
+  });
+  onValue(ref(db,`pix/${roomId}/active`), snap => {
+    if (snap.val() === true) enterGame();
+  });
+}
+
+function enterGame() {
+  document.getElementById('lobby').style.display = 'none';
+  drawGrid();
+  listenGame();
+}
+
+function listenGame() {
+  // Pixels
+  onValue(ref(db,`pix/${roomId}/pixels`), snap => {
+    const data = snap.val() || {};
+    grid = {};
+    Object.entries(data).forEach(([k,v]) => { grid[k.replace('_',',')] = v; });
+    drawGrid();
+  });
+  // Theme
+  onValue(ref(db,`pix/${roomId}/theme`), snap => {
+    document.getElementById('current-theme').textContent = snap.val() || 'Sin tema';
+  });
+  // Players
+  onValue(ref(db,`pix/${roomId}/players`), snap => {
+    if (!snap.exists()) return;
+    const ps = snap.val();
+    const list = document.getElementById('players-list');
+    list.innerHTML = '';
+    Object.entries(ps).forEach(([id, p]) => {
+      const row = document.createElement('div');
+      row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.marginBottom = '4px';
+      const dot = document.createElement('span');
+      dot.className = 'player-dot';
+      dot.style.background = p.color;
+      const name = document.createElement('span');
+      name.style.fontSize = '15px';
+      name.style.color = id === myId ? p.color : '#ddd';
+      name.textContent = p.name + (id === myId ? ' (tú)' : '');
+      row.appendChild(dot); row.appendChild(name);
+      list.appendChild(row);
+    });
+  });
+  // Chat
+  onValue(ref(db,`pix/${roomId}/chat`), snap => {
+    if (!snap.exists()) return;
+    const msgs = snap.val();
+    const arr = Array.isArray(msgs) ? msgs : Object.values(msgs);
+    const log = document.getElementById('chat-log');
+    log.innerHTML = '';
+    arr.slice(-30).forEach(m => {
+      const p = document.createElement('p');
+      p.className = m.type || '';
+      p.textContent = m.text;
+      log.appendChild(p);
+    });
+    log.scrollTop = log.scrollHeight;
+  });
+}
+
+window.setTheme = () => {
+  const theme = document.getElementById('theme-input').value.trim();
+  if (!theme) return;
+  update(ref(db,`pix/${roomId}`), { theme });
+  push(ref(db,`pix/${roomId}/chat`), { text:`🎯 Nuevo tema: ${theme}`, type:'system' });
+  document.getElementById('theme-input').value = '';
+};
+
+window.sendChat = () => {
+  const input = document.getElementById('chat-input');
+  const txt = input.value.trim();
+  input.value = '';
+  if (!txt) return;
+  push(ref(db,`pix/${roomId}/chat`), { text:`${myName}: ${txt}` });
+};
+
+document.getElementById('chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') window.sendChat();
+});
+
+// Initial draw
+drawGrid();
+</script>
+</body>
+</html>
