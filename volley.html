@@ -124,7 +124,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, set, get, onValue, update as fbUpdate } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDxMJXKfGJAngeSi-JbrtieIgyZZN5Q6P8",
@@ -213,7 +213,7 @@ window.joinOnline = () => {
   get(ref(db,`voly/${roomId}`)).then(snap => {
     if (!snap.exists()) { alert('Sala no encontrada'); return; }
     opponentName = snap.val().p1name || 'Rival';
-    update(ref(db,`voly/${roomId}`), { p2name:myName, state:'playing' });
+    fbUpdate(ref(db,`voly/${roomId}`), { p2name:myName, state:'playing' });
     startOnline();
   });
 };
@@ -302,7 +302,7 @@ function update() {
     const scorer = ball.x < NET_X ? 2 : 1;
     scores[scorer-1]++;
     updateScoreHUD();
-    if (gameMode==='online') update(ref(db,`voly/${roomId}`),{scores});
+    if (gameMode==='online') fbUpdate(ref(db,`voly/${roomId}`),{scores});
     if (scores[0]>=WIN_SCORE || scores[1]>=WIN_SCORE) { endGame(); return; }
     resetBall(scorer === 1 ? 2 : 1);
   }
@@ -329,7 +329,7 @@ function update() {
     if (syncTimer%3===0) {
       const myPosKey = myPlayer===1 ? 'p1' : 'p2';
       const myPos = myPlayer===1 ? {x:p1.x,y:p1.y,vy:p1.vy} : {x:p2.x,y:p2.y,vy:p2.vy};
-      update(ref(db,`voly/${roomId}`), {
+      fbUpdate(ref(db,`voly/${roomId}`), {
         [myPosKey]: myPos,
         ball2: {x:ball.x,y:ball.y,vx:ball.vx,vy:ball.vy,from:myPlayer}
       });
