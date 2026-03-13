@@ -141,6 +141,7 @@
       overflow: hidden;
       transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
       box-shadow: 0 12px 28px rgba(0,0,0,0.2);
+      cursor: pointer;
     }
 
     .game-card::before {
@@ -224,6 +225,66 @@
       font-size: 0.9rem;
     }
 
+    .game-viewer {
+      display: none;
+      margin-top: 24px;
+      background: rgba(10, 12, 28, 0.92);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    }
+
+    .game-viewer.active {
+      display: block;
+    }
+
+    .viewer-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 18px;
+      background: rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .viewer-title {
+      font-size: 1rem;
+      font-weight: bold;
+      color: var(--text);
+    }
+
+    .viewer-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .viewer-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      cursor: pointer;
+      color: white;
+      background: var(--accent);
+    }
+
+    .viewer-btn.secondary {
+      background: var(--accent-2);
+    }
+
+    #gameFrame {
+      width: 100%;
+      height: 80vh;
+      min-height: 700px;
+      border: none;
+      background: #111;
+      display: block;
+    }
+
     @media (max-width: 640px) {
       .wrapper {
         padding: 24px 14px 40px;
@@ -236,6 +297,16 @@
 
       .game-card {
         min-height: 200px;
+      }
+
+      #gameFrame {
+        height: 72vh;
+        min-height: 520px;
+      }
+
+      .viewer-topbar {
+        flex-direction: column;
+        align-items: flex-start;
       }
     }
   </style>
@@ -255,12 +326,12 @@
       <div class="top-bar">
         <div>
           <h2>Selecciona un juego</h2>
-          <div class="hint">Haz clic en una tarjeta para abrir la experiencia correspondiente.</div>
+          <div class="hint">Haz clic en una tarjeta para abrir la experiencia dentro del lobby.</div>
         </div>
       </div>
 
       <div class="games-grid">
-        <a class="game-card c1" href="pictionary.html">
+        <a class="game-card c1 game-link" href="pictionary.html" data-title="Pictionary">
           <div class="card-top">
             <span class="emoji">🎨</span>
             <span class="tag">Creativo</span>
@@ -273,7 +344,7 @@
           </div>
         </a>
 
-        <a class="game-card c2" href="/pixelart (1).html">
+        <a class="game-card c2 game-link" href="pixelart (1).html" data-title="Pixel Art">
           <div class="card-top">
             <span class="emoji">🖼️</span>
             <span class="tag">Colaborativo</span>
@@ -286,7 +357,7 @@
           </div>
         </a>
 
-        <a class="game-card c3" href="asesino.html">
+        <a class="game-card c3 game-link" href="asesino.html" data-title="El Asesino">
           <div class="card-top">
             <span class="emoji">🕵️</span>
             <span class="tag">Social</span>
@@ -299,7 +370,7 @@
           </div>
         </a>
 
-        <a class="game-card c1" href="wordle.html">
+        <a class="game-card c1 game-link" href="wordle.html" data-title="Wordle en Equipo">
           <div class="card-top">
             <span class="emoji">🔤</span>
             <span class="tag">Palabras</span>
@@ -312,7 +383,7 @@
           </div>
         </a>
 
-        <a class="game-card c2" href="precio.html">
+        <a class="game-card c2 game-link" href="precio.html" data-title="El Precio Justo">
           <div class="card-top">
             <span class="emoji">💰</span>
             <span class="tag">Competitivo</span>
@@ -325,7 +396,7 @@
           </div>
         </a>
 
-        <a class="game-card c3" href="verdades.html">
+        <a class="game-card c3 game-link" href="verdades.html" data-title="2 Verdades 1 Mentira">
           <div class="card-top">
             <span class="emoji">🤥</span>
             <span class="tag">Icebreaker</span>
@@ -338,7 +409,7 @@
           </div>
         </a>
 
-        <a class="game-card c1" href="tabu.html">
+        <a class="game-card c1 game-link" href="tabu.html" data-title="Tabú">
           <div class="card-top">
             <span class="emoji">🎭</span>
             <span class="tag">Risas</span>
@@ -352,10 +423,60 @@
         </a>
       </div>
 
+      <div class="game-viewer" id="gameViewer">
+        <div class="viewer-topbar">
+          <div class="viewer-title" id="viewerTitle">Juego cargado</div>
+          <div class="viewer-actions">
+            <button class="viewer-btn secondary" id="reloadGameBtn">Recargar juego</button>
+            <button class="viewer-btn" id="closeGameBtn">← Volver al lobby</button>
+          </div>
+        </div>
+        <iframe id="gameFrame" src=""></iframe>
+      </div>
+
       <div class="footer-note">
-        Consejo de supervivencia del lobby: si un enlace no abre, revisa que el nombre del archivo coincida exactamente.
+        Consejo de supervivencia del lobby: si un juego no carga, revisa que el nombre del archivo coincida exactamente.
       </div>
     </section>
   </main>
+
+  <script>
+    const gameLinks = document.querySelectorAll('.game-link');
+    const gameViewer = document.getElementById('gameViewer');
+    const gameFrame = document.getElementById('gameFrame');
+    const viewerTitle = document.getElementById('viewerTitle');
+    const closeGameBtn = document.getElementById('closeGameBtn');
+    const reloadGameBtn = document.getElementById('reloadGameBtn');
+
+    let currentGameUrl = '';
+
+    gameLinks.forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+
+        const url = this.getAttribute('href');
+        const title = this.dataset.title || 'Juego';
+
+        currentGameUrl = url;
+        viewerTitle.textContent = title;
+        gameFrame.src = url;
+        gameViewer.classList.add('active');
+
+        gameViewer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    closeGameBtn.addEventListener('click', () => {
+      gameFrame.src = '';
+      gameViewer.classList.remove('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    reloadGameBtn.addEventListener('click', () => {
+      if (currentGameUrl) {
+        gameFrame.src = currentGameUrl;
+      }
+    });
+  </script>
 </body>
 </html>
