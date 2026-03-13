@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arcade Lobby | Sala de Juegos</title>
+  <style>
+    :root {
+      --bg-1: #0f1020;
+      --bg-2: #1b1235;
+      --panel: rgba(19, 22, 48, 0.82);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --text: #f7f7ff;
+      --muted: #b8bdd8;
+      --accent: #7c5cff;
+      --accent-2: #14d9ff;
+      --accent-3: #ff4fd8;
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(124, 92, 255, 0.25), transparent 30%),
+        radial-gradient(circle at top right, rgba(20, 217, 255, 0.18), transparent 28%),
+        radial-gradient(circle at bottom center, rgba(255, 79, 216, 0.16), transparent 30%),
+        linear-gradient(135deg, var(--bg-1), var(--bg-2));
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 1250px;
+      margin: 0 auto;
+      padding: 40px 20px 60px;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 34px;
+    }
+
+    .badge {
+      display: inline-block;
+      margin-bottom: 14px;
+      padding: 8px 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      color: var(--muted);
+      font-size: 0.9rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 4.2rem);
+      line-height: 1.05;
+      margin-bottom: 14px;
+      text-shadow: 0 0 18px rgba(124, 92, 255, 0.4);
+    }
+
+    .hero p {
+      max-width: 760px;
+      margin: 0 auto;
+      color: var(--muted);
+      font-size: 1.08rem;
+      line-height: 1.6;
+    }
+
+    .lobby-panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      border-radius: 26px;
+      padding: 28px;
+    }
+
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 28px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .top-bar h2 {
+      font-size: 1.35rem;
+    }
+
+    .top-bar .hint {
+      color: var(--muted);
+      font-size: 0.96rem;
+    }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 18px;
+    }
+
+    .game-card {
+      position: relative;
+      display: block;
+      text-decoration: none;
+      color: var(--text);
+      min-height: 220px;
+      border-radius: 22px;
+      padding: 20px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04)),
+        rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      overflow: hidden;
+      transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.2);
+    }
+
+    .game-card::before {
+      content: "";
+      position: absolute;
+      inset: auto -40px -40px auto;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 65%);
+      pointer-events: none;
+    }
+
+    .game-card:hover {
+      transform: translateY(-8px) scale(1.01);
+      border-color: rgba(124, 92, 255, 0.55);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.32), 0 0 18px rgba(124, 92, 255, 0.18);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .emoji {
+      font-size: 2.1rem;
+      filter: drop-shadow(0 0 8px rgba(255,255,255,0.12));
+    }
+
+    .tag {
+      font-size: 0.78rem;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      color: var(--muted);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .game-card h3 {
+      font-size: 1.25rem;
+      margin-bottom: 10px;
+    }
+
+    .game-card p {
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 0.96rem;
+      margin-bottom: 18px;
+    }
+
+    .meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: auto;
+      font-size: 0.9rem;
+      color: #dfe3ff;
+    }
+
+    .players {
+      color: var(--muted);
+    }
+
+    .play {
+      font-weight: bold;
+      color: var(--accent-2);
+    }
+
+    .c1 { box-shadow: inset 0 0 0 1px rgba(124,92,255,0.08), 0 12px 28px rgba(0,0,0,0.2); }
+    .c2 { box-shadow: inset 0 0 0 1px rgba(20,217,255,0.08), 0 12px 28px rgba(0,0,0,0.2); }
+    .c3 { box-shadow: inset 0 0 0 1px rgba(255,79,216,0.08), 0 12px 28px rgba(0,0,0,0.2); }
+
+    .footer-note {
+      margin-top: 22px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 640px) {
+      .wrapper {
+        padding: 24px 14px 40px;
+      }
+
+      .lobby-panel {
+        padding: 18px;
+        border-radius: 20px;
+      }
+
+      .game-card {
+        min-height: 200px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrapper">
+    <section class="hero">
+      <div class="badge">WorkAdventure · Lobby Arcade</div>
+      <h1>🎮 Sala Central de Juegos</h1>
+      <p>
+        Bienvenida al lobby principal. Aquí tienes todos los minijuegos reunidos en una sola sala
+        para que cada persona entre, elija su partida favorita y empiece sin perderse por el mapa.
+      </p>
+    </section>
+
+    <section class="lobby-panel">
+      <div class="top-bar">
+        <div>
+          <h2>Selecciona un juego</h2>
+          <div class="hint">Haz clic en una tarjeta para abrir la experiencia correspondiente.</div>
+        </div>
+      </div>
+
+      <div class="games-grid">
+        <a class="game-card c1" href="pictionary.html">
+          <div class="card-top">
+            <span class="emoji">🎨</span>
+            <span class="tag">Creativo</span>
+          </div>
+          <h3>Pictionary</h3>
+          <p>Dibuja, adivina y demuestra que tus garabatos tienen más talento del que aparentan.</p>
+          <div class="meta">
+            <span class="players">Ilimitados</span>
+            <span class="play">Entrar →</span>
+          </div>
+        </a>
+
+        <a class="game-card c2" href="pixelart.html">
+          <div class="card-top">
+            <span class="emoji">🖼️</span>
+            <span class="tag">Colaborativo</span>
+          </div>
+          <h3>Pixel Art</h3>
+          <p>Crea ilustraciones entre todos y conviertan el caos colectivo en una obra sorprendentemente decente.</p>
+          <div class="meta">
+            <span class="players">Ilimitados</span>
+            <span class="play">Entrar →</span>
+          </div>
+        </a>
+
+        <a class="game-card c3" href="asesino.html">
+          <div class="card-top">
+            <span class="emoji">🕵️</span>
+            <span class="tag">Social</span>
+          </div>
+          <h3>El Asesino</h3>
+          <p>Observa, sospecha y acusa con cuidado. Aquí la paranoia no es un bug, es la mecánica principal.</p>
+          <div class="meta">
+            <span class="players">3-10 jugadores</span>
+            <span class="play">Entrar →</span>
+          </div>
+        </a>
+
+        <a class="game-card c1" href="wordle.html">
+          <div class="card-top">
+            <span class="emoji">🔤</span>
+            <span class="tag">Palabras</span>
+          </div>
+          <h3>Wordle en Equipo</h3>
+          <p>Pensad juntos, discutid letras imposibles y resolved el reto antes de que alguien proponga una palabra criminal.</p>
+          <div class="meta">
+            <span class="players">Ilimitados</span>
+            <span class="play">Entrar →</span>
+          </div>
+        </a>
+
+        <a class="game-card c2" href="precio.html">
+          <div class="card-top">
+            <span class="emoji">💰</span>
+            <span class="tag">Competitivo</span>
+          </div>
+          <h3>El Precio Justo</h3>
+          <p>Adivina precios, afina la intuición y comprueba quién vive realmente en contacto con el mundo real.</p>
+          <div class="meta">
+            <span class="players">Ilimitados</span>
+            <span class="play">Entrar →</span>
+          </div>
+        </a>
+
+        <a class="game-card c3" href="verdades.html">
+          <div class="card-top">
+            <span class="emoji">🤥</span>
+            <span class="tag">Icebreaker</span>
+          </div>
+          <h3>2 Verdades 1 Mentira</h3>
+          <p>Perfecto para descubrir secretos, anécdotas raras y quién tiene más facilidad para mentir con cara de inocencia.</p>
+          <div class="meta">
+            <span class="players">Ilimitados</span>
+            <span class="play">Entrar →</span>
+          </div>
+        </a>
+
+        <a class="game-card c1" href="tabu.html">
+          <div class="card-top">
+            <span class="emoji">🎭</span>
+            <span class="tag">Risas</span>
+          </div>
+          <h3>Tabú</h3>
+          <p>Describe, improvisa y evita las palabras prohibidas mientras tu equipo decide si te entiende o te adopta menos.</p>
+          <div class="meta">
+            <span class="players">3-10 jugadores</span>
+            <span class="play">Entrar →</span>
+          </div>
+        </a>
+      </div>
+
+      <div class="footer-note">
+        Consejo de supervivencia del lobby: si un enlace no abre, revisa que el nombre del archivo coincida exactamente.
+      </div>
+    </section>
+  </main>
+</body>
+</html>
