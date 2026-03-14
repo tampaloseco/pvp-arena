@@ -2,754 +2,547 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PvP Arena</title>
-<script src="https://play.workadventu.re/iframe_api.js"></script>
+<title>🥊 PvP Arena</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap');
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
   body {
-    background: #0a0a0f;
-    color: #fff;
-    font-family: 'VT323', monospace;
-    font-size: 18px;
-    overflow: hidden;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    background:#0a0a0a; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    height:100vh; overflow:hidden; font-family:'Press Start 2P',monospace;
   }
+  #hud { display:flex; justify-content:space-between; align-items:center; width:700px; margin-bottom:6px; gap:10px; }
+  .hp-wrap { flex:1; }
+  .hp-name { font-size:8px; margin-bottom:3px; }
+  .hp-bar-bg { background:#333; height:14px; border:1px solid #555; overflow:hidden; }
+  .hp-bar { height:100%; transition:width 0.15s; }
+  #hp1-name { color:#44aaff; }
+  #hp2-name { color:#ff4444; text-align:right; }
+  #hud-mid { text-align:center; min-width:70px; }
+  #hud-vs { font-size:14px; color:#ffdd44; }
+  #timer { font-size:12px; color:#fff; margin-top:2px; }
+  #wins-display { font-size:8px; color:#ffffff66; margin-top:2px; }
+  canvas { display:block; border:2px solid #333; }
+  #hints { margin-top:5px; color:#ffffff22; font-size:6px; display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+  #hints span { color:#ffffff44; }
 
-  /* Pixel grid background */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(0,255,100,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,255,100,0.03) 1px, transparent 1px);
-    background-size: 20px 20px;
-    pointer-events: none;
+  #overlay {
+    position:absolute; background:rgba(0,0,0,0.93); border:2px solid #ffffff22;
+    border-radius:6px; padding:24px 32px; display:flex; flex-direction:column;
+    align-items:center; gap:12px; min-width:320px;
   }
+  .otitle { font-size:14px; text-shadow:0 0 20px currentColor; text-align:center; line-height:2; }
+  .obtn { font-family:'Press Start 2P',monospace; font-size:8px; padding:10px 16px; border:2px solid; background:transparent; cursor:pointer; transition:all 0.15s; width:100%; }
+  .obtn:hover { filter:brightness(1.5); }
+  .by { color:#ffdd44; border-color:#ffdd44; } .by:hover { background:#ffdd4420; }
+  .bb { color:#44aaff; border-color:#44aaff; } .bb:hover { background:#44aaff20; }
+  .bg { color:#44ffaa; border-color:#44ffaa; } .bg:hover { background:#44ffaa20; }
+  .bgr { color:#aaa; border-color:#aaa; } .bgr:hover { background:#aaaaaa20; }
+  .ninp { background:#050505; border:2px solid #ffffff22; color:#fff; font-family:'Press Start 2P',monospace; font-size:9px; padding:8px 10px; width:100%; text-align:center; outline:none; }
+  .ninp:focus { border-color:#ffdd44; }
+  .codebig { font-size:20px; color:#44aaff; text-shadow:0 0 12px #44aaff; letter-spacing:4px; text-align:center; }
+  .row { display:flex; gap:8px; width:100%; align-items:center; }
 
-  #arena {
-    width: 360px;
-    background: #0f1a0f;
-    border: 3px solid #22ff44;
-    box-shadow: 0 0 20px #22ff4440, inset 0 0 20px #00000080;
-    padding: 16px;
-    position: relative;
+  #announce {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    font-size:22px; color:#ffdd44; text-shadow:0 0 30px #ffdd44;
+    text-align:center; pointer-events:none; opacity:0;
+    transition:opacity 0.2s; white-space:nowrap;
   }
-
-  /* Scanline effect */
-  #arena::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0,0,0,0.15) 2px,
-      rgba(0,0,0,0.15) 4px
-    );
-    pointer-events: none;
-  }
-
-  h1 {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 11px;
-    color: #ffdd00;
-    text-align: center;
-    text-shadow: 0 0 10px #ffdd0080;
-    margin-bottom: 14px;
-    letter-spacing: 2px;
-  }
-
-  .fighters {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-
-  .fighter {
-    flex: 1;
-    background: #0a120a;
-    border: 2px solid #1a3a1a;
-    padding: 10px 8px;
-    text-align: center;
-    transition: border-color 0.2s;
-  }
-
-  .fighter.active {
-    border-color: #22ff44;
-    box-shadow: 0 0 8px #22ff4440;
-  }
-
-  .fighter.hurt {
-    animation: hurt 0.4s steps(2);
-    border-color: #ff2244 !important;
-  }
-
-  .fighter-name {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 7px;
-    color: #88ff88;
-    margin-bottom: 8px;
-    word-break: break-all;
-  }
-
-  .fighter-sprite {
-    font-size: 30px;
-    line-height: 1;
-    margin-bottom: 8px;
-    display: block;
-  }
-
-  .hp-label {
-    font-size: 13px;
-    color: #aaa;
-    margin-bottom: 4px;
-  }
-
-  .hp-bar-wrap {
-    background: #1a1a1a;
-    border: 1px solid #333;
-    height: 14px;
-    width: 100%;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .hp-bar {
-    height: 100%;
-    transition: width 0.3s steps(5), background 0.3s;
-    background: #22ff44;
-  }
-
-  .hp-bar.low { background: #ffaa00; }
-  .hp-bar.critical { background: #ff2244; animation: blink 0.5s steps(1) infinite; }
-
-  .hp-text {
-    font-size: 16px;
-    color: #fff;
-    margin-top: 4px;
-  }
-
-  .vs-badge {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 14px;
-    color: #ff4444;
-    text-shadow: 0 0 10px #ff444480;
-    align-self: center;
-    flex-shrink: 0;
-  }
-
-  #log {
-    background: #050e05;
-    border: 1px solid #1a3a1a;
-    padding: 8px;
-    height: 90px;
-    overflow-y: auto;
-    margin-bottom: 12px;
-    font-size: 15px;
-    line-height: 1.5;
-    scroll-behavior: smooth;
-  }
-
-  #log p {
-    color: #88cc88;
-    padding: 1px 0;
-  }
-  #log p.dmg { color: #ff6655; }
-  #log p.heal { color: #55ff99; }
-  #log p.system { color: #ffdd00; }
-  #log p.win { color: #fff; font-family: 'Press Start 2P', monospace; font-size: 9px; }
-  #log p.death { color: #ff2244; }
-
-  .controls {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 10px;
-  }
-
-  button {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 8px;
-    padding: 10px 6px;
-    border: 2px solid;
-    cursor: pointer;
-    background: transparent;
-    transition: all 0.1s;
-    letter-spacing: 0.5px;
-    position: relative;
-    overflow: hidden;
-  }
-
-  button:active { transform: translateY(2px); }
-
-  .btn-attack {
-    color: #ff4444;
-    border-color: #ff4444;
-  }
-  .btn-attack:hover {
-    background: #ff444420;
-    box-shadow: 0 0 8px #ff444440;
-  }
-
-  .btn-special {
-    color: #ffaa00;
-    border-color: #ffaa00;
-  }
-  .btn-special:hover {
-    background: #ffaa0020;
-    box-shadow: 0 0 8px #ffaa0040;
-  }
-
-  .btn-heal {
-    color: #22ff44;
-    border-color: #22ff44;
-  }
-  .btn-heal:hover {
-    background: #22ff4420;
-    box-shadow: 0 0 8px #22ff4440;
-  }
-
-  .btn-defend {
-    color: #44aaff;
-    border-color: #44aaff;
-  }
-  .btn-defend:hover {
-    background: #44aaff20;
-    box-shadow: 0 0 8px #44aaff40;
-  }
-
-  button:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-    box-shadow: none;
-  }
-
-  .cooldown-bar {
-    position: absolute;
-    bottom: 0; left: 0;
-    height: 3px;
-    background: currentColor;
-    width: 0%;
-    transition: width linear;
-  }
-
-  #status-bar {
-    text-align: center;
-    font-size: 14px;
-    color: #aaa;
-    border-top: 1px solid #1a3a1a;
-    padding-top: 8px;
-  }
-
-  #status-bar .turn-indicator {
-    color: #22ff44;
-    font-family: 'Press Start 2P', monospace;
-    font-size: 7px;
-  }
-
-  #waiting-screen {
-    text-align: center;
-    padding: 20px 0;
-  }
-
-  #waiting-screen .pulse {
-    animation: pulse 1.5s steps(3) infinite;
-    font-family: 'Press Start 2P', monospace;
-    font-size: 9px;
-    color: #22ff44;
-    margin-bottom: 14px;
-  }
-
-  #waiting-screen .player-info {
-    color: #88ff88;
-    font-size: 16px;
-    margin-top: 10px;
-  }
-
-  #game-over {
-    display: none;
-    text-align: center;
-    padding: 10px 0;
-  }
-
-  #winner-text {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 10px;
-    color: #ffdd00;
-    text-shadow: 0 0 15px #ffdd00;
-    margin-bottom: 12px;
-    animation: pulse 0.8s steps(2) infinite;
-  }
-
-  .btn-restart {
-    color: #22ff44;
-    border-color: #22ff44;
-    width: 100%;
-    margin-top: 6px;
-    font-size: 9px;
-    padding: 12px;
-  }
-
-  @keyframes hurt {
-    0%, 100% { background: #0a120a; }
-    50% { background: #3a0a0a; }
-  }
-  @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-
-  .badge-uses {
-    font-size: 12px;
-    color: #888;
-    display: block;
-    margin-top: 2px;
-  }
+  #announce.show { opacity:1; }
 </style>
 </head>
 <body>
 
-<div id="arena">
-  <h1>⚔ PVP ARENA ⚔</h1>
-
-  <!-- Waiting screen -->
-  <div id="waiting-screen">
-    <div class="pulse" id="wait-status">BUSCANDO RIVAL...</div>
-    <div style="font-size:40px; margin: 10px 0;">⚔️</div>
-    <div class="player-info" id="my-name-display">Cargando...</div>
-    <div style="color:#555; font-size:14px; margin-top:10px;" id="wait-hint">
-      Acércate a otro jugador<br>para iniciar el duelo
-    </div>
-    <button id="btn-challenge" onclick="manualChallenge()" style="display:none;margin-top:12px;font-family:'Press Start 2P',monospace;font-size:8px;padding:10px 16px;border:2px solid #22ff44;color:#22ff44;background:transparent;cursor:pointer;">
-      ⚔ DESAFIAR
-    </button>
+<div id="hud">
+  <div class="hp-wrap">
+    <div class="hp-name" id="hp1-name">J1</div>
+    <div class="hp-bar-bg"><div class="hp-bar" id="hp1-bar" style="width:100%"></div></div>
   </div>
+  <div id="hud-mid">
+    <div id="hud-vs">VS</div>
+    <div id="timer">60</div>
+    <div id="wins-display">●○ ○●</div>
+  </div>
+  <div class="hp-wrap">
+    <div class="hp-name" id="hp2-name" style="text-align:right">J2</div>
+    <div class="hp-bar-bg"><div class="hp-bar" id="hp2-bar" style="width:100%;margin-left:auto"></div></div>
+  </div>
+</div>
 
-  <!-- Battle screen -->
-  <div id="battle-screen" style="display:none">
-    <div class="fighters">
-      <div class="fighter active" id="f1">
-        <div class="fighter-name" id="f1-name">TÚ</div>
-        <span class="fighter-sprite">🧙</span>
-        <div class="hp-label">HP</div>
-        <div class="hp-bar-wrap">
-          <div class="hp-bar" id="f1-bar" style="width:100%"></div>
-        </div>
-        <div class="hp-text"><span id="f1-hp">100</span>/100</div>
+<div style="position:relative;">
+  <canvas id="c" width="700" height="400"></canvas>
+  <div id="announce"></div>
+  <div id="overlay">
+    <div id="s-menu">
+      <div class="otitle" style="color:#ffdd44">🥊 PvP<br>ARENA</div>
+      <input class="ninp" id="ninp" type="text" placeholder="TU NOMBRE" maxlength="12" style="margin-bottom:8px;"/>
+      <button class="obtn by" id="btn-cpu">🤖 VS MÁQUINA</button>
+      <button class="obtn bb" id="btn-create" style="margin-top:4px;">🆕 CREAR PARTIDA ONLINE</button>
+      <div class="row" style="margin-top:4px;">
+        <input class="ninp" id="cinp" type="text" maxlength="4" placeholder="CÓDIGO" style="width:110px;" oninput="this.value=this.value.toUpperCase()"/>
+        <button class="obtn bg" style="margin:0;" id="btn-join">▶ UNIRSE</button>
       </div>
-
-      <div class="vs-badge">VS</div>
-
-      <div class="fighter" id="f2">
-        <div class="fighter-name" id="f2-name">RIVAL</div>
-        <span class="fighter-sprite">🧝</span>
-        <div class="hp-label">HP</div>
-        <div class="hp-bar-wrap">
-          <div class="hp-bar" id="f2-bar" style="width:100%"></div>
-        </div>
-        <div class="hp-text"><span id="f2-hp">100</span>/100</div>
-      </div>
     </div>
-
-    <div id="log"></div>
-
-    <div class="controls" id="action-buttons">
-      <button class="btn-attack" id="btn-attack" onclick="doAction('attack')">
-        ⚔ ATACAR
-        <span class="badge-uses" id="atk-uses"></span>
-        <div class="cooldown-bar" id="cd-attack"></div>
-      </button>
-      <button class="btn-special" id="btn-special" onclick="doAction('special')">
-        💥 ESPECIAL
-        <span class="badge-uses" id="spc-uses">x2</span>
-        <div class="cooldown-bar" id="cd-special"></div>
-      </button>
-      <button class="btn-heal" id="btn-heal" onclick="doAction('heal')">
-        💊 CURAR
-        <span class="badge-uses" id="heal-uses">x2</span>
-        <div class="cooldown-bar" id="cd-heal"></div>
-      </button>
-      <button class="btn-defend" id="btn-defend" onclick="doAction('defend')">
-        🛡 DEFENDER
-        <span class="badge-uses" id="def-uses">x3</span>
-        <div class="cooldown-bar" id="cd-defend"></div>
-      </button>
+    <div id="s-wait" style="display:none;text-align:center;">
+      <div class="otitle" style="color:#44aaff">⏳ ESPERANDO...</div>
+      <div style="color:#ffffff44;font-size:7px;margin-bottom:6px;">CÓDIGO DE SALA:</div>
+      <div class="codebig" id="wcode"></div>
+      <div style="color:#ffffff44;font-size:7px;margin-top:8px;">Comparte el código con tu rival</div>
     </div>
-
-    <div id="status-bar">
-      <span class="turn-indicator" id="turn-text">TU TURNO</span>
-    </div>
-
-    <div id="game-over">
-      <div id="winner-text">¡VICTORIA!</div>
-      <button class="btn-restart" onclick="restartGame()">▶ NUEVA PARTIDA</button>
+    <div id="s-over" style="display:none;text-align:center;">
+      <div class="otitle" id="over-txt" style="color:#ffdd44"></div>
+      <button class="obtn by" id="btn-restart" style="margin-top:10px;">▶ REVANCHA</button>
+      <button class="obtn bgr" id="btn-menu" style="margin-top:6px;">🏠 MENÚ</button>
     </div>
   </div>
 </div>
 
-<script>
-// ═══════════════════════════════════════════
-//  PvP ARENA — WorkAdventure iFrame Script
-//  Funciona en el plan FREE via iFrame API
-// ═══════════════════════════════════════════
+<div id="hints">
+  <div><span>A/←</span>IZQ <span>D/→</span>DER <span>W/↑</span>SALTAR <span>S/↓</span>BLOQUEAR</div>
+  <div><span>J</span>GOLPE <span>K</span>PATADA <span>L</span>ESPECIAL</div>
+</div>
 
-const MAX_HP = 100;
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, update as dbUp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+const FB={apiKey:"AIzaSyDxMJXKfGJAngeSi-JbrtieIgyZZN5Q6P8",authDomain:"billar-workadventure.firebaseapp.com",databaseURL:"https://billar-workadventure-default-rtdb.europe-west1.firebasedatabase.app",projectId:"billar-workadventure",storageBucket:"billar-workadventure.firebasestorage.app",messagingSenderId:"773546684259",appId:"1:773546684259:web:034a2dcd3702d8b5766d56"};
+const db=getDatabase(initializeApp(FB,'pvp3'));
 
-let myName = "Tú";
-let enemyName = "Rival";
-let enemyPlayer = null;
+const CV=document.getElementById('c'), cx=CV.getContext('2d');
+const W=700, H=400, GND=H-70;
+const GRAV=0.55, JF=-13, SPD=3.2, MAX_HP=100;
 
-let myHP = MAX_HP;
-let enemyHP = MAX_HP;
+let mode=null, myP=1, rid=null, myName='J1', oppName='J2';
+let raf=null, keys={}, syncT=0;
+let f1=null, f2=null, hp=[MAX_HP,MAX_HP];
+let round=1, wins=[0,0];
+let timerVal=60, timerInt=null;
+let effects=[], floats=[];
+let gameActive=false;
+let frameCount=0;
 
-let myTurn = true;
-let gameActive = false;
-let defending = false;
+const CROWD=Array.from({length:22},(_,i)=>({x:20+i*(W-40)/21,col:`hsl(${Math.random()*360},35%,${22+Math.random()*12}%)`,h:28+Math.random()*18,ph:Math.random()*Math.PI*2}));
+const TORCHES=[{x:60},{x:W-60}];
 
-let specialUses = 2;
-let healUses = 2;
-let defendUses = 3;
-
-const log = document.getElementById('log');
-
-function addLog(msg, type = '') {
-  const p = document.createElement('p');
-  p.className = type;
-  p.textContent = msg;
-  log.appendChild(p);
-  log.scrollTop = log.scrollHeight;
+function mkF(x,facing,name){
+  return{x,y:GND-60,vy:0,vx:0,facing,state:'idle',stTimer:0,name,blocking:false,combo:0,lastHit:0,af:0,at:0};
 }
 
-function updateHP(who, val) {
-  const hp = Math.max(0, Math.min(MAX_HP, val));
-  const pct = (hp / MAX_HP) * 100;
-  const bar = document.getElementById(who + '-bar');
-  const txt = document.getElementById(who + '-hp');
-
-  bar.style.width = pct + '%';
-  bar.className = 'hp-bar' + (pct <= 25 ? ' critical' : pct <= 50 ? ' low' : '');
-  txt.textContent = hp;
-
-  if (who === 'f1') myHP = hp;
-  else enemyHP = hp;
+function initRound(){
+  f1=mkF(140,1,myName);
+  f2=mkF(W-180,-1,oppName);
+  hp=[MAX_HP,MAX_HP];
+  timerVal=60; effects=[]; floats=[];
+  gameActive=true; frameCount=0;
+  updHUD(); updWins();
+  startTimer();
+  showAnnounce('ROUND '+round, 1800);
 }
 
-function hurtAnimation(fighterId) {
-  const el = document.getElementById(fighterId);
-  el.classList.add('hurt');
-  setTimeout(() => el.classList.remove('hurt'), 400);
-}
-
-function setTurn(isMyTurn) {
-  myTurn = isMyTurn;
-  document.getElementById('turn-text').textContent = isMyTurn ? '⚡ TU TURNO' : '⏳ TURNO DEL RIVAL';
-  const btns = document.querySelectorAll('#action-buttons button');
-  btns.forEach(b => b.disabled = !isMyTurn);
-  document.getElementById('f1').classList.toggle('active', isMyTurn);
-  document.getElementById('f2').classList.toggle('active', !isMyTurn);
-}
-
-function cooldown(btnId, seconds) {
-  const btn = document.getElementById(btnId);
-  const bar = document.getElementById('cd-' + btnId.replace('btn-', ''));
-  if (!bar) return;
-  btn.disabled = true;
-  bar.style.transition = 'none';
-  bar.style.width = '100%';
-  setTimeout(() => {
-    bar.style.transition = `width ${seconds}s linear`;
-    bar.style.width = '0%';
-  }, 50);
-  setTimeout(() => { if (!gameActive || !myTurn) return; btn.disabled = false; }, seconds * 1000);
-}
-
-function doAction(type) {
-  if (!myTurn || !gameActive) return;
-  defending = false;
-
-  let dmg = 0;
-  let msg = '';
-
-  if (type === 'attack') {
-    dmg = Math.floor(Math.random() * 20) + 10; // 10-29
-    msg = `⚔ ${myName} ataca por ${dmg} de daño!`;
-    updateHP('f2', enemyHP - dmg);
-    hurtAnimation('f2');
-    addLog(msg, 'dmg');
-    // Notify rival via WA state
-    try { WA.player.state.saveVariable('pvp_action', { type: 'attack', dmg, from: myName }); } catch(e){}
-
-  } else if (type === 'special') {
-    if (specialUses <= 0) return;
-    specialUses--;
-    document.getElementById('spc-uses').textContent = `x${specialUses}`;
-    dmg = Math.floor(Math.random() * 35) + 25; // 25-59
-    msg = `💥 ${myName} usa ESPECIAL por ${dmg}!`;
-    updateHP('f2', enemyHP - dmg);
-    hurtAnimation('f2');
-    addLog(msg, 'dmg');
-    if (specialUses <= 0) document.getElementById('btn-special').disabled = true;
-    try { WA.player.state.saveVariable('pvp_action', { type: 'special', dmg, from: myName }); } catch(e){}
-
-  } else if (type === 'heal') {
-    if (healUses <= 0) return;
-    healUses--;
-    document.getElementById('heal-uses').textContent = `x${healUses}`;
-    const heal = Math.floor(Math.random() * 15) + 15; // 15-29
-    msg = `💊 ${myName} se cura ${heal} HP!`;
-    updateHP('f1', myHP + heal);
-    addLog(msg, 'heal');
-    if (healUses <= 0) document.getElementById('btn-heal').disabled = true;
-    try { WA.player.state.saveVariable('pvp_action', { type: 'heal', val: heal, from: myName }); } catch(e){}
-
-  } else if (type === 'defend') {
-    if (defendUses <= 0) return;
-    defendUses--;
-    document.getElementById('def-uses').textContent = `x${defendUses}`;
-    defending = true;
-    msg = `🛡 ${myName} se pone en guardia!`;
-    addLog(msg, '');
-    if (defendUses <= 0) document.getElementById('btn-defend').disabled = true;
-    try { WA.player.state.saveVariable('pvp_action', { type: 'defend', from: myName }); } catch(e){}
-  }
-
-  checkWin();
-  if (gameActive) setTurn(false);
-}
-
-function enemyTurn() {
-  // Simple AI for solo testing OR called when rival's WA variable updates
-  if (!gameActive) return;
-  const actions = ['attack', 'attack', 'attack', 'special', 'heal', 'defend'];
-  const pick = actions[Math.floor(Math.random() * actions.length)];
-  let dmg = 0;
-
-  setTimeout(() => {
-    if (pick === 'attack') {
-      dmg = Math.floor(Math.random() * 20) + 10;
-      if (defending) { dmg = Math.floor(dmg * 0.4); addLog(`🛡 ¡Bloqueaste! Daño reducido a ${dmg}`, ''); }
-      updateHP('f1', myHP - dmg);
-      hurtAnimation('f1');
-      addLog(`⚔ ${enemyName} ataca por ${dmg} de daño!`, 'dmg');
-    } else if (pick === 'special') {
-      dmg = Math.floor(Math.random() * 35) + 25;
-      if (defending) { dmg = Math.floor(dmg * 0.4); addLog(`🛡 ¡Bloqueaste! Daño reducido a ${dmg}`, ''); }
-      updateHP('f1', myHP - dmg);
-      hurtAnimation('f1');
-      addLog(`💥 ${enemyName} usa ESPECIAL por ${dmg}!`, 'dmg');
-    } else if (pick === 'heal') {
-      const heal = Math.floor(Math.random() * 15) + 15;
-      updateHP('f2', enemyHP + heal);
-      addLog(`💊 ${enemyName} se cura ${heal} HP!`, 'heal');
-    } else {
-      addLog(`🛡 ${enemyName} se defiende!`, '');
-    }
-    defending = false;
-    checkWin();
-    if (gameActive) setTurn(true);
-  }, 1200);
-}
-
-function checkWin() {
-  if (myHP <= 0) {
-    endGame(false);
-  } else if (enemyHP <= 0) {
-    endGame(true);
-  }
-}
-
-function endGame(win) {
-  gameActive = false;
-  document.getElementById('action-buttons').style.display = 'none';
-  document.getElementById('status-bar').style.display = 'none';
-  document.getElementById('game-over').style.display = 'block';
-
-  const txt = document.getElementById('winner-text');
-  if (win) {
-    txt.textContent = `🏆 ¡${myName} GANA!`;
-    txt.style.color = '#ffdd00';
-    addLog(`🏆 ¡${myName} es el campeón!`, 'win');
-    try { WA.chat.sendChatMessage(`🏆 ¡${myName} gana el duelo contra ${enemyName}!`, 'Arena PvP'); } catch(e){}
-  } else {
-    txt.textContent = `💀 ¡${enemyName} GANA!`;
-    txt.style.color = '#ff2244';
-    addLog(`💀 ${enemyName} ha ganado el duelo.`, 'death');
-    try { WA.chat.sendChatMessage(`💀 ${myName} ha sido derrotado por ${enemyName}!`, 'Arena PvP'); } catch(e){}
-  }
-}
-
-function startGame(rivalName) {
-  myHP = MAX_HP;
-  enemyHP = MAX_HP;
-  specialUses = 2;
-  healUses = 2;
-  defendUses = 3;
-  defending = false;
-  gameActive = true;
-
-  enemyName = rivalName || 'Rival';
-  document.getElementById('f1-name').textContent = myName;
-  document.getElementById('f2-name').textContent = enemyName;
-  document.getElementById('spc-uses').textContent = 'x2';
-  document.getElementById('heal-uses').textContent = 'x2';
-  document.getElementById('def-uses').textContent = 'x3';
-
-  updateHP('f1', MAX_HP);
-  updateHP('f2', MAX_HP);
-  log.innerHTML = '';
-
-  document.getElementById('waiting-screen').style.display = 'none';
-  document.getElementById('battle-screen').style.display = 'block';
-  document.getElementById('action-buttons').style.display = 'grid';
-  document.getElementById('status-bar').style.display = 'block';
-  document.getElementById('game-over').style.display = 'none';
-
-  addLog(`¡El duelo entre ${myName} y ${enemyName} comienza!`, 'system');
-  setTurn(true);
-}
-
-function restartGame() {
-  document.getElementById('battle-screen').style.display = 'none';
-  document.getElementById('waiting-screen').style.display = 'block';
-  gameActive = false;
-  addLog('', '');
-}
-
-// ══════════════════════════
-//  WorkAdventure Integration
-// ══════════════════════════
-
-let nearbyPlayers = {};
-
-function updateWaitUI() {
-  const count = Object.keys(nearbyPlayers).length;
-  const btn = document.getElementById('btn-challenge');
-  const status = document.getElementById('wait-status');
-  const hint = document.getElementById('wait-hint');
-
-  if (count > 0) {
-    const names = Object.values(nearbyPlayers).map(p => p.name).join(', ');
-    status.textContent = `¡${names} ESTÁ CERCA!`;
-    hint.textContent = 'Pulsa el botón para iniciar el duelo';
-    btn.style.display = 'block';
-  } else {
-    status.textContent = 'BUSCANDO RIVAL...';
-    hint.innerHTML = 'Acércate a otro jugador<br>para iniciar el duelo';
-    btn.style.display = 'none';
-  }
-}
-
-window.manualChallenge = function() {
-  const players = Object.values(nearbyPlayers);
-  if (players.length > 0 && !gameActive) {
-    enemyPlayer = players[0];
-    startGame(enemyPlayer.name);
-  }
+// Buttons
+document.getElementById('btn-cpu').onclick=function(){
+  myName=document.getElementById('ninp').value.trim()||'Jugador';
+  oppName='CPU'; mode='cpu'; hideOv(); initRound(); go();
 };
+document.getElementById('btn-create').onclick=function(){
+  myName=document.getElementById('ninp').value.trim()||'Jugador';
+  rid=Math.random().toString(36).substr(2,4).toUpperCase(); myP=1;
+  sw('s-wait'); document.getElementById('wcode').textContent=rid;
+  set(ref(db,'pvp3/'+rid),{state:'wait',p1n:myName,p2n:'',hp:[100,100],round:1,wins:[0,0]});
+  onValue(ref(db,'pvp3/'+rid+'/state'),snap=>{
+    if(snap.val()==='play'&&mode!=='online'){mode='online';hideOv();initRound();listenFB();go();}
+  });
+};
+document.getElementById('btn-join').onclick=function(){
+  myName=document.getElementById('ninp').value.trim()||'Jugador';
+  const code=document.getElementById('cinp').value.trim().toUpperCase();
+  if(!code)return; rid=code; myP=2;
+  get(ref(db,'pvp3/'+rid)).then(snap=>{
+    if(!snap.exists()){alert('Sala no encontrada');return;}
+    oppName=snap.val().p1n||'Rival';
+    dbUp(ref(db,'pvp3/'+rid),{p2n:myName,state:'play'});
+    mode='online'; hideOv(); initRound();
+    f1.name=oppName; f2.name=myName;
+    listenFB(); go();
+  });
+};
+document.getElementById('btn-restart').onclick=function(){hideOv();round=1;wins=[0,0];initRound();go();};
+document.getElementById('btn-menu').onclick=function(){cancelAnimationFrame(raf);raf=null;stopTimer();sw('s-menu');showOv();};
 
-WA.onInit().then(() => {
-  myName = WA.player.name || 'Tú';
-  document.getElementById('my-name-display').textContent = `👤 ${myName}`;
+// Firebase
+function listenFB(){
+  onValue(ref(db,'pvp3/'+rid),snap=>{
+    if(!snap.exists()||!f1)return;
+    const d=snap.val();
+    const opp=myP===1?f2:f1;
+    const ok=myP===1?'f2':'f1';
+    if(d[ok]){const o=d[ok];opp.x=o.x;opp.y=o.y;opp.facing=o.f;opp.state=o.s;opp.stTimer=o.st||0;opp.blocking=o.bl||false;}
+    if(d.hp){hp=d.hp;updHUD();}
+    if(d.hit&&d.hit.by!==myP){applyHit(d.hit.t===1?f1:f2,d.hit.d,d.hit.tp);dbUp(ref(db,'pvp3/'+rid),{hit:null});}
+  });
+}
+function syncMe(){
+  if(mode!=='online')return;
+  const me=myP===1?f1:f2; const k=myP===1?'f1':'f2';
+  dbUp(ref(db,'pvp3/'+rid),{[k]:{x:+me.x.toFixed(1),y:+me.y.toFixed(1),f:me.facing,s:me.state,st:me.stTimer,bl:me.blocking}});
+}
 
-  // Track nearby players
-  WA.players.configureTracking().then(() => {
+// Loop
+function go(){cancelAnimationFrame(raf);raf=requestAnimationFrame(tick);}
+function tick(){frameCount++;if(gameActive)step();draw();raf=requestAnimationFrame(tick);}
 
-    // Check players already nearby when iframe opens
-    try {
-      const existing = WA.players.list();
-      existing.forEach(player => {
-        nearbyPlayers[player.id] = player;
-        addLog(`${player.name} está cerca. ¡Pulsa DESAFIAR!`, 'system');
-      });
-      updateWaitUI();
-      // Auto-start if someone already there
-      if (Object.keys(nearbyPlayers).length > 0 && !gameActive) {
-        setTimeout(() => {
-          if (!gameActive && Object.keys(nearbyPlayers).length > 0) {
-            const p = Object.values(nearbyPlayers)[0];
-            enemyPlayer = p;
-            startGame(p.name);
-          }
-        }, 1500);
-      }
-    } catch(e) {}
+// Step
+function step(){
+  if(!f1||!f2)return;
+  const me=myP===1||mode==='cpu'?f1:f2;
+  const opp=myP===1||mode==='cpu'?f2:f1;
 
-    WA.players.onPlayerEnters.subscribe((player) => {
-      nearbyPlayers[player.id] = player;
-      updateWaitUI();
-      addLog(`⚔ ${player.name} se acerca...`, 'system');
-      if (!gameActive) {
-        enemyPlayer = player;
-        setTimeout(() => {
-          if (!gameActive && nearbyPlayers[player.id]) {
-            startGame(player.name);
-          }
-        }, 1500);
-      }
-    });
+  // Controls
+  if(me.state!=='ko'){
+    const L=keys['a']||keys['ArrowLeft'], R=keys['d']||keys['ArrowRight'];
+    if(L&&me.stTimer<5){me.vx=Math.max(-SPD,me.vx-0.6);if(me.state==='idle')me.state='walk';}
+    else if(R&&me.stTimer<5){me.vx=Math.min(SPD,me.vx+0.6);if(me.state==='idle')me.state='walk';}
+    else{me.vx*=0.65;if(Math.abs(me.vx)<0.1){me.vx=0;if(me.state==='walk')me.state='idle';}}
 
-    WA.players.onPlayerLeaves.subscribe((player) => {
-      delete nearbyPlayers[player.id];
-      updateWaitUI();
-      if (gameActive && enemyPlayer && enemyPlayer.id === player.id) {
-        addLog(`${player.name} ha abandonado el duelo.`, 'system');
-        endGame(true);
-      }
-    });
+    if((keys['w']||keys['ArrowUp'])&&me.y>=GND-62){me.vy=JF;me.state='jump';}
 
-    // Listen for rival actions via player variables
-    WA.players.onVariableChange('pvp_action').subscribe((event) => {
-      if (!gameActive || myTurn) return;
-      const action = event.value;
-      if (!action || action.from === myName) return;
+    const canBlock=(keys['s']||keys['ArrowDown'])&&me.y>=GND-62&&me.stTimer===0;
+    me.blocking=canBlock;
+    if(canBlock&&me.state!=='punch'&&me.state!=='kick'&&me.state!=='special')me.state='block';
+    else if(me.state==='block'&&!canBlock)me.state='idle';
 
-      if (action.type === 'attack' || action.type === 'special') {
-        let dmg = action.dmg;
-        if (defending) { dmg = Math.floor(dmg * 0.4); addLog(`🛡 ¡Bloqueaste! Daño reducido a ${dmg}`, ''); }
-        updateHP('f1', myHP - dmg);
-        hurtAnimation('f1');
-        addLog(`${action.type === 'special' ? '💥' : '⚔'} ${enemyName} ataca por ${dmg}!`, 'dmg');
-        defending = false;
-      } else if (action.type === 'heal') {
-        updateHP('f2', enemyHP + action.val);
-        addLog(`💊 ${enemyName} se cura ${action.val} HP!`, 'heal');
-      } else if (action.type === 'defend') {
-        addLog(`🛡 ${enemyName} se defiende!`, '');
-      }
+    if(keys['j']&&me.stTimer===0)attack(me,opp,'punch',14,65);
+    if(keys['k']&&me.stTimer===0)attack(me,opp,'kick',20,72);
+    if(keys['l']&&me.stTimer===0)attack(me,opp,'special',30,88,true);
+  }
 
-      checkWin();
-      if (gameActive) setTurn(true);
-    });
+  me.facing=me.x<opp.x?1:-1;
+  phys(f1); phys(f2);
+  if(mode==='cpu')cpuAI(opp,me);
+
+  [f1,f2].forEach(f=>{
+    if(f.stTimer>0){f.stTimer--;if(f.stTimer===0&&['punch','kick','special','hurt'].includes(f.state))f.state='idle';}
+    f.at++; if(f.at%8===0)f.af=1-f.af;
   });
 
-}).catch(() => {
-  // Fallback: demo mode sin WorkAdventure
-  myName = 'Jugador';
-  document.getElementById('my-name-display').textContent = `👤 Demo Mode`;
-  document.getElementById('wait-status').textContent = 'MODO DEMO';
-  setTimeout(() => startGame('CPU Enemy'), 1000);
-  const origSetTurn = setTurn;
-  window.setTurn = function(isMyTurn) {
-    origSetTurn(isMyTurn);
-    if (!isMyTurn && gameActive) enemyTurn();
-  };
-});
+  f1.x=Math.max(5,Math.min(W-50,f1.x));
+  f2.x=Math.max(5,Math.min(W-50,f2.x));
+  const dx=f2.x-f1.x;
+  if(Math.abs(dx)<52){const p=(52-Math.abs(dx))/2*(dx<0?-1:1);f1.x-=p;f2.x+=p;}
+
+  effects=effects.filter(e=>e.t>0);
+  effects.forEach(e=>{e.t--;e.x+=(e.vx||0);e.y+=(e.vy||0);e.vy=(e.vy||0)+0.15;});
+  floats=floats.filter(t=>t.t>0);
+  floats.forEach(t=>{t.t--;t.y-=0.7;});
+
+  syncT++;if(syncT%2===0)syncMe();
+}
+
+function phys(f){
+  f.vy+=GRAV; f.y+=f.vy; f.x+=f.vx;
+  if(f.y>=GND-60){f.y=GND-60;f.vy=0;if(f.state==='jump')f.state='idle';}
+}
+
+function attack(me,opp,type,dmg,range,special){
+  me.state=type; me.stTimer=type==='punch'?22:type==='kick'?28:38;
+  const dist=Math.abs((me.x+20)-(opp.x+20));
+  if(dist<range){
+    let d=dmg+Math.floor(Math.random()*8);
+    if(opp.blocking){d=Math.floor(d*0.12);addFloat('BLOCK!',opp.x+10,opp.y-15,'#88ccff');}
+    else{
+      const now=Date.now();
+      if(now-me.lastHit<700)me.combo++;else me.combo=1;
+      me.lastHit=now;
+      if(me.combo>=3)addFloat('COMBO x'+me.combo+'!',me.x,me.y-40,'#ffdd44');
+    }
+    if(mode==='online'){dbUp(ref(db,'pvp3/'+rid),{hit:{t:opp===f1?1:2,d,tp:type,by:myP}});}
+    else applyHit(opp,d,type);
+    spawnFX(opp.x+20,opp.y+25,type);
+  }
+}
+
+function applyHit(f,dmg,type){
+  const i=f===f1?0:1;
+  hp[i]=Math.max(0,hp[i]-dmg);
+  f.state='hurt'; f.stTimer=16;
+  const dir=f===f1?-1:1;
+  f.vx=dir*(type==='special'?9:type==='kick'?5:3);
+  f.vy=-3;
+  addFloat('-'+dmg,f.x+10,f.y-8,'#ff4444');
+  updHUD();
+  if(mode==='online')dbUp(ref(db,'pvp3/'+rid),{hp});
+  if(hp[i]<=0){f.state='ko';f.stTimer=9999;stopTimer();setTimeout(()=>endRound(i===0?1:0),1200);}
+}
+
+function spawnFX(x,y,type){
+  const col=type==='special'?'#ff8800':type==='kick'?'#ff4444':'#ffffaa';
+  for(let i=0;i<7;i++) effects.push({x,y,vx:(Math.random()-0.5)*6,vy:-2-Math.random()*3,t:18,col,r:2+Math.random()*4});
+}
+function addFloat(t,x,y,col){floats.push({txt:t,x,y,col,t:55});}
+
+function cpuAI(cpu,player){
+  if(cpu.state==='ko'||cpu.state==='hurt')return;
+  const dist=Math.abs(cpu.x-player.x);
+  const dir=cpu.x>player.x?-1:1;
+  if(dist>90){cpu.vx=dir*SPD*0.75;cpu.state='walk';}
+  else if(dist<35){cpu.vx=-dir*SPD*0.5;}
+  else{cpu.vx*=0.6;if(Math.abs(cpu.vx)<0.1)cpu.vx=0;}
+  const isAttacking=['punch','kick','special'].includes(player.state);
+  cpu.blocking=isAttacking&&dist<80&&Math.random()<0.4;
+  if(cpu.state==='block'&&!cpu.blocking)cpu.state='idle';
+  if(cpu.y>=GND-62&&Math.random()<0.008)cpu.vy=JF;
+  if(dist<80&&cpu.stTimer===0&&!cpu.blocking&&Math.random()<0.07){
+    const r=Math.random();
+    if(r<0.5)attack(cpu,player,'punch',14,68);
+    else if(r<0.8)attack(cpu,player,'kick',20,75);
+    else attack(cpu,player,'special',28,85,true);
+  }
+}
+
+function endRound(winIdx){
+  wins[winIdx]++;
+  gameActive=false;
+  const wname=winIdx===0?f1.name:f2.name;
+  showAnnounce(wname+'\nGANA!',2000);
+  updWins();
+  if(wins[0]>=2||wins[1]>=2){
+    setTimeout(()=>{
+      document.getElementById('over-txt').innerHTML='🏆 '+wname.toUpperCase()+'<br>GANA!';
+      sw('s-over');showOv();
+    },2200);
+  } else {
+    round++;
+    setTimeout(()=>initRound(),2800);
+  }
+}
+
+function startTimer(){
+  stopTimer();
+  timerInt=setInterval(()=>{
+    timerVal--;
+    document.getElementById('timer').textContent=timerVal;
+    document.getElementById('timer').style.color=timerVal<=10?'#ff4444':'#fff';
+    if(timerVal<=0){
+      stopTimer();gameActive=false;
+      const w=hp[0]>hp[1]?0:hp[1]>hp[0]?1:-1;
+      if(w===-1){showAnnounce('¡EMPATE!',2000);setTimeout(()=>initRound(),2800);}
+      else endRound(w);
+    }
+  },1000);
+}
+function stopTimer(){clearInterval(timerInt);timerInt=null;}
+
+function showAnnounce(msg,ms){
+  const el=document.getElementById('announce');
+  el.innerHTML=msg.replace('\n','<br>');
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),ms);
+}
+
+function updHUD(){
+  const pct0=hp[0]/MAX_HP*100, pct1=hp[1]/MAX_HP*100;
+  document.getElementById('hp1-bar').style.width=pct0+'%';
+  document.getElementById('hp2-bar').style.width=pct1+'%';
+  const c0=pct0>50?'linear-gradient(90deg,#44aaff,#88ccff)':pct0>25?'linear-gradient(90deg,#ffaa00,#ffcc44)':'linear-gradient(90deg,#ff2244,#ff6666)';
+  const c1=pct1>50?'linear-gradient(90deg,#ff4444,#ff8888)':pct1>25?'linear-gradient(90deg,#ffaa00,#ffcc44)':'linear-gradient(90deg,#ff2244,#ff6666)';
+  document.getElementById('hp1-bar').style.background=c0;
+  document.getElementById('hp2-bar').style.background=c1;
+  document.getElementById('hp1-name').textContent=(f1?f1.name:'J1');
+  document.getElementById('hp2-name').textContent=(f2?f2.name:'J2');
+}
+function updWins(){
+  document.getElementById('wins-display').textContent=
+    (wins[0]>0?'★'.repeat(wins[0]):'○')+'  '+(wins[1]>0?'★'.repeat(wins[1]):'○');
+}
+
+// Draw
+function draw(){
+  cx.clearRect(0,0,W,H);
+
+  // BG gradient
+  const bg=cx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#180820');bg.addColorStop(0.6,'#241030');bg.addColorStop(1,'#100818');
+  cx.fillStyle=bg;cx.fillRect(0,0,W,H);
+
+  // Crowd
+  CROWD.forEach((c,i)=>{
+    const bob=gameActive?Math.sin(frameCount*0.06+c.ph)*(hp[0]<50||hp[1]<50?6:3):0;
+    cx.fillStyle=c.col;
+    cx.fillRect(c.x-7,GND-c.h+bob,14,c.h);
+    cx.beginPath();cx.arc(c.x,GND-c.h-6+bob,8,0,Math.PI*2);cx.fill();
+    if(gameActive&&(hp[0]<30||hp[1]<30)){
+      // Arms up when exciting
+      cx.strokeStyle=c.col;cx.lineWidth=3;cx.lineCap='round';
+      cx.beginPath();cx.moveTo(c.x-7,GND-c.h+10+bob);cx.lineTo(c.x-14,GND-c.h-5+bob);cx.stroke();
+      cx.beginPath();cx.moveTo(c.x+7,GND-c.h+10+bob);cx.lineTo(c.x+14,GND-c.h-5+bob);cx.stroke();
+    }
+  });
+
+  // Arena floor
+  cx.fillStyle='#3a2a1a';cx.fillRect(0,GND,W,H-GND);
+  const flg=cx.createLinearGradient(0,GND,0,GND+10);
+  flg.addColorStop(0,'#5a4030');flg.addColorStop(1,'#3a2a1a');
+  cx.fillStyle=flg;cx.fillRect(0,GND,W,10);
+  // Floor lines
+  cx.strokeStyle='rgba(255,200,100,0.07)';cx.lineWidth=1;
+  for(let x=0;x<W;x+=50){cx.beginPath();cx.moveTo(x,GND);cx.lineTo(x,H);cx.stroke();}
+
+  // Torches
+  TORCHES.forEach(t=>{
+    cx.fillStyle='#3a2010';cx.fillRect(t.x-4,GND-55,8,45);
+    const fl=Math.sin(frameCount*0.12)*0.4;
+    cx.shadowColor='#ff8800';cx.shadowBlur=20;
+    cx.fillStyle=`rgba(255,${130+Math.floor(fl*50)},0,0.95)`;
+    cx.beginPath();cx.arc(t.x,GND-58,9+fl*2,0,Math.PI*2);cx.fill();
+    cx.fillStyle='rgba(255,220,0,0.6)';
+    cx.beginPath();cx.arc(t.x,GND-58,4,0,Math.PI*2);cx.fill();
+    cx.shadowBlur=0;
+    // Torch light on floor
+    const tg=cx.createRadialGradient(t.x,GND,0,t.x,GND,100);
+    tg.addColorStop(0,'rgba(255,150,0,0.08)');tg.addColorStop(1,'rgba(0,0,0,0)');
+    cx.fillStyle=tg;cx.fillRect(t.x-100,GND,200,H-GND);
+  });
+
+  // Center divider
+  cx.strokeStyle='rgba(255,200,100,0.1)';cx.lineWidth=2;cx.setLineDash([6,6]);
+  cx.beginPath();cx.moveTo(W/2,GND);cx.lineTo(W/2,H);cx.stroke();
+  cx.setLineDash([]);
+
+  // Fighters
+  if(f1)drawF(f1,'#44aaff','#1a5588','#ffdd44');
+  if(f2)drawF(f2,'#ff4444','#881a1a','#ffffff');
+
+  // Hit effects
+  effects.forEach(e=>{
+    cx.globalAlpha=Math.max(0,e.t/18);
+    cx.fillStyle=e.col;
+    cx.beginPath();cx.arc(e.x,e.y,e.r,0,Math.PI*2);cx.fill();
+  });
+  cx.globalAlpha=1;
+
+  // Floating texts
+  floats.forEach(t=>{
+    const a=Math.min(1,t.t/20);
+    cx.globalAlpha=a;
+    cx.font='bold 9px "Press Start 2P"';cx.textAlign='center';
+    cx.fillStyle=t.col;cx.fillText(t.txt,t.x,t.y);
+  });
+  cx.globalAlpha=1;
+}
+
+function drawF(f,col,dark,hairCol){
+  const x=f.x,y=f.y,d=f.facing;
+  const ko=f.state==='ko', hurt=f.state==='hurt', block=f.blocking;
+
+  // Shadow
+  cx.fillStyle='rgba(0,0,0,0.25)';
+  cx.beginPath();cx.ellipse(x+20,GND+6,22,5,0,0,Math.PI*2);cx.fill();
+
+  if(ko){
+    // Knocked out - lying flat
+    cx.save();cx.translate(x+20,GND-8);cx.rotate(d*Math.PI/2);
+    cx.fillStyle=col;cx.fillRect(-28,-10,56,20);
+    cx.fillStyle='#f5c5a3';cx.beginPath();cx.arc(-28,0,11,0,Math.PI*2);cx.fill();
+    // X eyes
+    cx.strokeStyle='#222';cx.lineWidth=2;
+    cx.beginPath();cx.moveTo(-32,-4);cx.lineTo(-25,3);cx.stroke();
+    cx.beginPath();cx.moveTo(-25,-4);cx.lineTo(-32,3);cx.stroke();
+    cx.restore();return;
+  }
+
+  // Hurt flash
+  if(hurt&&Math.floor(frameCount/4)%2===0)return;
+
+  cx.save();cx.translate(x,y);
+
+  // Legs
+  const walk=f.state==='walk';
+  const lb=walk?Math.sin(f.at*0.25)*8:0;
+  cx.fillStyle=dark;
+  cx.fillRect(7,42+lb,11,20);cx.fillRect(22,42-lb,11,20);
+  cx.fillStyle='#111';
+  cx.fillRect(d>0?5:7,60+lb,15,6);cx.fillRect(d>0?20:22,60-lb,15,6);
+
+  // Body
+  cx.fillStyle=col;cx.fillRect(5,10,30,34);
+  cx.fillStyle=dark;cx.fillRect(5,36,30,8);
+  // Belt buckle
+  cx.fillStyle='#ffdd44';cx.fillRect(16,37,8,5);
+  // Shirt detail
+  cx.fillStyle='rgba(255,255,255,0.12)';cx.fillRect(9,13,12,18);
+
+  // Block shield effect
+  if(block){
+    cx.fillStyle='rgba(80,140,255,0.35)';
+    cx.beginPath();cx.arc(20,20,32,0,Math.PI*2);cx.fill();
+    cx.strokeStyle='rgba(120,180,255,0.7)';cx.lineWidth=2;
+    cx.beginPath();cx.arc(20,20,32,0,Math.PI*2);cx.stroke();
+  }
+
+  // Head
+  cx.fillStyle='#f5c5a3';cx.beginPath();cx.arc(20,-4,13,0,Math.PI*2);cx.fill();
+  cx.fillStyle=hairCol;cx.beginPath();cx.arc(20,-10,12,Math.PI,0);cx.fill();
+  // Eyes
+  const ex=d>0?26:11;
+  cx.fillStyle='#111';cx.fillRect(ex,-8,5,4);
+  // Angry brows
+  cx.strokeStyle='#111';cx.lineWidth=2;cx.lineCap='round';
+  if(hurt){cx.beginPath();cx.moveTo(ex-1,-11);cx.lineTo(ex+5,-8);cx.stroke();}
+  else{cx.beginPath();cx.moveTo(ex-1,-12);cx.lineTo(ex+5,-9);cx.stroke();}
+
+  // Arms
+  cx.strokeStyle='#f5c5a3';cx.lineWidth=6;cx.lineCap='round';
+
+  if(f.state==='punch'){
+    const ext=d*(18+f.stTimer*0.8);
+    cx.beginPath();cx.moveTo(20,18);cx.lineTo(20+ext,12);cx.stroke();
+    cx.beginPath();cx.moveTo(20,18);cx.lineTo(20-d*10,26);cx.stroke();
+    cx.shadowColor='rgba(255,220,100,0.8)';cx.shadowBlur=10;
+    cx.fillStyle='rgba(255,210,80,0.7)';
+    cx.beginPath();cx.arc(20+ext,12,7,0,Math.PI*2);cx.fill();
+    cx.shadowBlur=0;
+  } else if(f.state==='kick'){
+    // Kick leg
+    const kext=d*(22+f.stTimer*0.9);
+    cx.strokeStyle=dark;cx.lineWidth=8;
+    cx.beginPath();cx.moveTo(20,38);cx.lineTo(20+kext,25);cx.stroke();
+    cx.fillStyle='#111';cx.fillRect(20+kext-7,20,15,7);
+    cx.strokeStyle='#f5c5a3';cx.lineWidth=6;
+    cx.beginPath();cx.moveTo(8,18);cx.lineTo(2,30);cx.stroke();
+    cx.beginPath();cx.moveTo(32,18);cx.lineTo(38,28);cx.stroke();
+  } else if(f.state==='special'){
+    // Both hands forward, energy ball
+    cx.beginPath();cx.moveTo(8,18);cx.lineTo(8+d*28,8);cx.stroke();
+    cx.beginPath();cx.moveTo(32,18);cx.lineTo(32+d*28,8);cx.stroke();
+    const ex2=20+d*34;
+    cx.shadowColor='#ff8800';cx.shadowBlur=15;
+    cx.fillStyle='rgba(255,120,0,0.9)';
+    cx.beginPath();cx.arc(ex2,8,13,0,Math.PI*2);cx.fill();
+    cx.fillStyle='rgba(255,220,0,0.7)';
+    cx.beginPath();cx.arc(ex2,8,7,0,Math.PI*2);cx.fill();
+    cx.shadowBlur=0;
+  } else {
+    const sw2=walk?Math.sin(f.at*0.25)*10:0;
+    cx.beginPath();cx.moveTo(8,18);cx.lineTo(2,32+sw2);cx.stroke();
+    cx.beginPath();cx.moveTo(32,18);cx.lineTo(38,32-sw2);cx.stroke();
+  }
+
+  if(f.state==='jump'){
+    cx.fillStyle='rgba(255,255,255,0.06)';
+    for(let i=1;i<=3;i++)cx.fillRect(4,8+i*14,32,8);
+  }
+
+  cx.restore();
+}
+
+function hideOv(){document.getElementById('overlay').style.display='none';}
+function showOv(){document.getElementById('overlay').style.display='flex';}
+function sw(id){['s-menu','s-wait','s-over'].forEach(s=>document.getElementById(s).style.display='none');document.getElementById(id).style.display='block';}
+
+document.addEventListener('keydown',e=>{keys[e.key]=true;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});
+document.addEventListener('keyup',e=>{keys[e.key]=false;});
+cx.fillStyle='#180820';cx.fillRect(0,0,W,H);
 </script>
 </body>
 </html>
