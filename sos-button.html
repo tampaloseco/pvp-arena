@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🆘 Botón SOS</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+    }
+    h1 { color: #fff; font-size: 1.1rem; letter-spacing: 2px; opacity: 0.5; text-transform: uppercase; }
+    #nombre-input {
+      padding: 12px 20px;
+      border-radius: 10px;
+      border: 2px solid #333;
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 1rem;
+      text-align: center;
+      width: 260px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    #nombre-input:focus { border-color: #ff2222; }
+    #nombre-input::placeholder { color: #555; }
+    #sos-btn {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, #ff4444, #cc0000);
+      border: 6px solid #ff2222;
+      color: white;
+      font-size: 2.5rem;
+      font-weight: 900;
+      letter-spacing: 4px;
+      cursor: pointer;
+      box-shadow: 0 0 40px rgba(255,0,0,0.4), 0 0 80px rgba(255,0,0,0.15);
+      transition: transform 0.1s, box-shadow 0.2s;
+    }
+    #sos-btn:hover {
+      box-shadow: 0 0 60px rgba(255,0,0,0.6), 0 0 100px rgba(255,0,0,0.25);
+      transform: scale(1.04);
+    }
+    #sos-btn:active { transform: scale(0.96); }
+    #sos-btn.enviando {
+      background: radial-gradient(circle at 40% 35%, #ff8800, #cc5500);
+      border-color: #ff8800;
+      box-shadow: 0 0 40px rgba(255,136,0,0.5);
+      cursor: not-allowed;
+    }
+    #sos-btn.ok {
+      background: radial-gradient(circle at 40% 35%, #44cc44, #228822);
+      border-color: #44cc44;
+      box-shadow: 0 0 40px rgba(0,255,0,0.4);
+    }
+    #estado {
+      color: #888;
+      font-size: 0.9rem;
+      height: 20px;
+      text-align: center;
+      transition: color 0.3s;
+    }
+    #estado.ok { color: #44cc44; }
+    #estado.error { color: #ff4444; }
+  </style>
+</head>
+<body>
+  <h1>Alerta de urgencia</h1>
+  <input id="nombre-input" type="text" placeholder="Tu nombre" />
+  <button id="sos-btn" onclick="enviarSOS()">SOS</button>
+  <div id="estado">Listo para enviar</div>
+
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwH3J1g1H4uZ4HALVf7RwGzPgfwlNqjM_LrMVL-RE98glN4y3GDX9JCidiGHpp7ecKZ/exec";
+
+    window.onload = () => {
+      const saved = localStorage.getItem('sos_nombre');
+      if (saved) document.getElementById('nombre-input').value = saved;
+    };
+
+    document.getElementById('nombre-input').addEventListener('change', e => {
+      localStorage.setItem('sos_nombre', e.target.value);
+    });
+
+    async function enviarSOS() {
+      const btn = document.getElementById('sos-btn');
+      const estado = document.getElementById('estado');
+      const nombre = document.getElementById('nombre-input').value.trim() || 'Alguien';
+
+      btn.classList.add('enviando');
+      btn.textContent = '...';
+      estado.textContent = 'Enviando alerta...';
+      estado.className = '';
+
+      // Usamos un <img> trick para evitar problemas de CORS con Google Apps Script
+      const img = new Image();
+      img.src = `${SCRIPT_URL}?nombre=${encodeURIComponent(nombre)}&t=${Date.now()}`;
+
+      setTimeout(() => {
+        btn.classList.remove('enviando');
+        btn.classList.add('ok');
+        btn.textContent = '✓';
+        estado.textContent = '✅ Alerta enviada al equipo';
+        estado.className = 'ok';
+        setTimeout(() => {
+          btn.classList.remove('ok');
+          btn.textContent = 'SOS';
+          estado.textContent = 'Listo para enviar';
+          estado.className = '';
+        }, 4000);
+      }, 1500);
+    }
+  </script>
+</body>
+</html>
